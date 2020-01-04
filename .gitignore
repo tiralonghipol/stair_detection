@@ -34,3 +34,6 @@
 /build
 /devel
 /logs
+
+# ignore lidar_sitch repo files
+lidar_sitch/

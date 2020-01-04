@@ -1,0 +1,7 @@
+<launch>
+    <arg name="rviz" default="true" />
+    <node name="stairdetect" pkg="stairdetect" type="stairdetect_node" output="screen"> 
+        <!-- <param name="topic_command_trajectory" value="/m100/command/trajectory" type="str"/> -->
+        <!-- <param name="topic_command_trajectory" value="/command/trajectory" type="str"/> -->
+    </node>
+</launch>
