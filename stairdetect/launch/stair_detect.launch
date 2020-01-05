@@ -1,6 +1,13 @@
 <launch>
     <arg name="rviz" default="true" />
     <node name="stairdetect" pkg="stairdetect" type="stairdetect_node" output="screen"> 
-        <param name="topic_stitched_pointcloud" value="points_stitched" type="str"/>
+
+        <!-- topic names -->
+        <param name="topic_stitched_pointcloud" value="/lidar_stitch/points_stitched" type="str"/>
+        <param name="topic_pose" value="/msf_core/pose" type="str"/>
+        <param name="topic_trimmed_pcl" value="trimmed_pcl" type="str"/>
+
+        <!-- test mode flag -->
+        <param name="test_mode" value="true" type="bool"/>
     </node>
 </launch>
