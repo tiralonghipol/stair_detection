@@ -29,10 +29,13 @@ using namespace std;
 class stairDetector{
     public:
     stairDetector(ros::NodeHandle & n, const std::string & s, int bufSize);
-    void callback_pointcloud(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr & msg);
+    void callback_stitched_pcl(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr & msg);
 
     private:
-    ros::Subscriber _subPointCloud;
+    ros::Subscriber _sub_stitched_pcl;
+
+    // topic names
+    std::string _topic_stitched_pcl;
 };
 
 #endif 
