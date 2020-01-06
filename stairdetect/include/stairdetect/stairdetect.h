@@ -22,18 +22,30 @@
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 
 // opencv stuff
-#include <opencv2/core/core.hpp>
-#include "opencv2/core/mat.hpp"
-#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 
 #include <cv_bridge/cv_bridge.h>
 
 
 using namespace std;
+using namespace cv;
+
+struct stairDetectorParams
+{
+    bool debug;
+	double canny_low_th = 40;
+	double canny_ratio = 10;
+	int canny_kernel_size = 1;
+};
+
 class stairDetector{
     public:
     stairDetector(ros::NodeHandle & n, const std::string & s, int bufSize);
-    
+    void setParam(const stairDetectorParams &param);
+
     // callbacks
     // void callback_stitched_pcl(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr & msg);
     void callback_stitched_pcl(const pcl::PointCloud<pcl::PointXYZ>::Ptr & msg);
@@ -43,9 +55,12 @@ class stairDetector{
     void trim_stitched_pcl(pcl::PCLPointCloud2 & trimmed_cloud);
     // cv::Mat pcl2bird_view()
 
-    void filter_img(const cv::Mat &bird_view_img);
-  	// void houghLine(const cv::Mat &edge_image, Lines &lines);
+    // image operations
+    // void filter_img(const cv::Mat &bird_view_img);
+    void filter_img();
+    void cannyEdgeDetection(const cv::Mat &input_image, cv::Mat &edge);
 
+  	// void houghLine(const cv::Mat &edge_image, Lines &lines);
 
 
     private:
@@ -66,7 +81,10 @@ class stairDetector{
     int _z_lim;
 
     // test mode flag
-    bool _test_mode;
+    // bool _test_mode;
+
+    // parameter container 
+    stairDetectorParams _param;
 
     // 
     int _pose_Q_size;
