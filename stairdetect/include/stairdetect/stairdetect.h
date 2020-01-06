@@ -16,14 +16,16 @@
 #include <iostream>
 #include <string>
 #include <cmath>
+#include <ctime>
 // #include <Eigen/Dense>
 #include "Eigen/Geometry"
-#include <ctime>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 
 // opencv stuff
 #include <opencv2/core/core.hpp>
 #include "opencv2/core/mat.hpp"
+#include <opencv2/highgui/highgui.hpp>
+
 #include <cv_bridge/cv_bridge.h>
 
 
@@ -39,6 +41,12 @@ class stairDetector{
 
     // other functions
     void trim_stitched_pcl(pcl::PCLPointCloud2 & trimmed_cloud);
+    // cv::Mat pcl2bird_view()
+
+    void filter_img(const cv::Mat &bird_view_img);
+  	// void houghLine(const cv::Mat &edge_image, Lines &lines);
+
+
 
     private:
     // subscribers
