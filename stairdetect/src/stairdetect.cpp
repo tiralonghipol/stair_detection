@@ -48,11 +48,18 @@ void stairDetector::callback_stitched_pcl(
     return;
 }
 
-void stairDetector::callback_timer_trigger(const ros::TimerEvent& event)
+void stairDetector::callback_timer_trigger(
+    const ros::TimerEvent& event)
 {
+    cv::Mat img(
+        int(_param.img_xy_dim / _param.img_resolution), 
+        int(_param.img_xy_dim / _param.img_resolution), 
+        CV_8UC1,
+        cv::Scalar(0));
+
     // convert most recently-received pointcloud to birds-eye-view image
     // std::clock_t c_start = std::clock();
-    pcl_to_bird_view_img(_recent_cloud);
+    pcl_to_bird_view_img(_recent_cloud, img);
     // std::clock_t c_end = std::clock();
     // std::cout << "bime in birds-eye image construction: " << (c_end - c_start)/CLOCKS_PER_SEC << std::endl;
 
@@ -61,14 +68,10 @@ void stairDetector::callback_timer_trigger(const ros::TimerEvent& event)
     return;
 }
 
-void stairDetector::pcl_to_bird_view_img(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
+void stairDetector::pcl_to_bird_view_img(
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
+    cv::Mat & img)
 {
-    cv::Mat img(
-        int(_param.img_xy_dim / _param.img_resolution), 
-        int(_param.img_xy_dim / _param.img_resolution), 
-        CV_8UC1,
-        cv::Scalar(0));
-
     int img_midpt = int(_param.img_xy_dim / _param.img_resolution) / 2;
 
     // get current xy
