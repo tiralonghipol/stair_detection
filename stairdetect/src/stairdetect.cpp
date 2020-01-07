@@ -3,10 +3,12 @@
 
 stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSize)
 {
-
+    // _recent_cloud = new pcl::PointCloud<pcl::PointXYZ>;
+    _recent_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    
     // dynamic reconfigure
-    _dyn_rec_cb = boost::bind(&stairDetector::callback_dyn_reconf, this, _1, _2);
-    _dr_srv.setCallback(_dyn_rec_cb);
+    // _dyn_rec_cb = boost::bind(&stairDetector::callback_dyn_reconf, this, _1, _2);
+    // _dr_srv.setCallback(_dyn_rec_cb);
 
     // get params from .launch file
     // topics
@@ -184,9 +186,9 @@ void stairDetector::filter_img(cv::Mat &img)
 }
 
 void stairDetector::publish_img_msgs(
-    cv::Mat & img_bird_view,
-    cv::Mat & img_edge,
-    cv::Mat & img_line)
+    cv::Mat &img_bird_view,
+    cv::Mat &img_edge,
+    cv::Mat &img_line)
 {
     // publish birds-eye image
     sensor_msgs::ImagePtr bird_view_img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img_bird_view).toImageMsg();
