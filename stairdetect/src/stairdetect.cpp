@@ -188,17 +188,17 @@ void stairDetector::filter_img(cv::Mat &img)
     if (_param.debug)
     {
 
-        namedWindow("Edge Image", CV_WINDOW_NORMAL);
-        imshow("Edge Image", edge_img);
-        resizeWindow("Edge Image", 300, 300);
+        // namedWindow("Edge Image", CV_WINDOW_NORMAL);
+        // imshow("Edge Image", edge_img);
+        // resizeWindow("Edge Image", 300, 300);
 
-        namedWindow("Hough Lines", CV_WINDOW_NORMAL);
-        imshow("Hough Lines", hough_img); // Show our image inside it.
-        resizeWindow("Hough Lines", 300, 300);
+        // namedWindow("Hough Lines", CV_WINDOW_NORMAL);
+        // imshow("Hough Lines", hough_img); // Show our image inside it.
+        // resizeWindow("Hough Lines", 300, 300);
+        // waitKey(0); 
 
-        waitKey(0); // Wait for a keystroke in the window
-        // sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", edge_img).toImageMsg();
-        // _pub_bird_view_img.publish(img_msg);
+        sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", hough_img).toImageMsg();
+        _pub_bird_view_img.publish(img_msg);
     }
     return;
 }

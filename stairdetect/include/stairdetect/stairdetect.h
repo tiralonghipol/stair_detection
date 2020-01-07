@@ -34,64 +34,9 @@
 #include <dynamic_reconfigure/server.h>
 #include <stairdetect/StairDetectConfig.h>
 
-// #define PI 3.141592654
-
 using namespace std;
 using namespace cv;
 
-// class Line
-// {
-// public:
-//   // In opencv x is col, y is row
-
-//   Line(double x1 = 0, double y1 = 0, double x2 = 0, double y2 = 0)
-//   {
-//     this->k = (y1 - y2) / (x1 - x2);
-//     this->b = y1 - k * x1;
-//     // this->t = - atan2( y1 - y2, x1 - x2);
-//     this->t = atan((y1 - y2) / (x1 - x2));
-//     this->r = x1 * sin(t) + y1 * cos(t);
-//     this->p1 = *new cv::Point(x1, y1);
-//     this->p2 = *new cv::Point(x2, y2);
-//     this->center = p1 - p2;
-//     this->length = cv::norm(this->p1 - this->p2);
-//   }
-
-//   Line(cv::Point p1, cv::Point p2) : Line(p1.x, p1.y, p2.x, p2.y) {}
-
-//   Line(cv::Vec4i line) : Line(line[0], line[1], line[2], line[3]) {}
-
-//   Line() {}
-
-//   void calPixels(cv::Mat src)
-//   {
-//     this->pixels.clear();
-//     cv::LineIterator it(src, p1, p2, 8, true);
-//     pixels_num = it.count;
-//     for (int i = 0; i < pixels_num; i++, ++it)
-//     {
-//       pixels.push_back(it.pos());
-//     }
-//   }
-
-//   friend std::ostream &operator<<(std::ostream &os, const Line &line)
-//   {
-//     os << "Point1: " << line.p1 << " Point2: " << line.p2 << " k:" << line.k
-//        << " b:" << line.b << " t: " << line.t << " r: " << line.r;
-//     return os;
-//   }
-
-//   double k, b = 0;
-//   double r, t = 0;
-//   double length = 0;
-//   cv::Point p1;
-//   cv::Point p2;
-//   cv::Point center;
-//   int pixels_num = 0;
-//   // cv::LineIterator it;
-//   std::vector<cv::Point> pixels;
-// };
-// typedef std::vector<Line> Lines;
 
 struct stairDetectorParams
 {

@@ -5,7 +5,7 @@
 // #include <dynamic_reconfigure/server.h>
 // #include <stairdetect/StairDetectConfig.h>
 
-stairDetectorParams param;
+// stairDetectorParams param;
 
 int main(int argc, char **argv)
 {
@@ -15,8 +15,9 @@ int main(int argc, char **argv)
     // stairDetector sd = stairDetector(nh, "stair_detector_node", 100);
     stairDetector *sd = new stairDetector(nh, "stair_detector_node", 100);
 
-    param.debug = true;
-    sd->setParam(param);
+    // param.debug = true;
+    // sd->setParam(param);
+    // sd.setParam(param);
 
     
     
@@ -27,8 +28,8 @@ int main(int argc, char **argv)
     // cb = boost::bind(&stairDetector::callback_dyn_reconf, sd, _1, _2);
     // dr_srv.setCallback(cb);
     
-    Mat tmp;
-    sd->filter_img(tmp);
+    // Mat tmp;
+    // sd->filter_img(tmp);
 
     ros::spin();
     return 0;
