@@ -2,8 +2,8 @@
 #include "stairdetect/stairdetect.h"
 #include <boost/bind.hpp>
 
-#include <dynamic_reconfigure/server.h>
-#include <stairdetect/StairDetectConfig.h>
+// #include <dynamic_reconfigure/server.h>
+// #include <stairdetect/StairDetectConfig.h>
 
 stairDetectorParams param;
 
@@ -18,11 +18,15 @@ int main(int argc, char **argv)
     param.debug = true;
     sd->setParam(param);
 
+    
+    
+    
     // dynamic_reconfigure::Server<stairdetect::StairDetectConfig> dr_srv;
+
     // dynamic_reconfigure::Server<stairdetect::StairDetectConfig>::CallbackType cb;
     // cb = boost::bind(&stairDetector::callback_dyn_reconf, sd, _1, _2);
-    // // dr_srv.waitForService (const std::string &service_name, int32_t timeout)
     // dr_srv.setCallback(cb);
+    
     Mat tmp;
     sd->filter_img(tmp);
 
