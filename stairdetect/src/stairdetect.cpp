@@ -90,9 +90,21 @@ void stairDetector::pcl_to_bird_view_img(
         img.at<uchar>(idx_x, idx_y) = 255;
     }
 
+<<<<<<< Updated upstream
     // make and publish message
 	sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img).toImageMsg();    
     _pub_bird_view_img.publish(img_msg);
+=======
+
+
+    return;
+}
+
+void stairDetector::pcl_to_bird_view(
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud)
+{
+    
+>>>>>>> Stashed changes
     return;
 }
 

@@ -60,8 +60,11 @@ class stairDetector{
 
     // other functions
     void trim_stitched_pcl(pcl::PCLPointCloud2 & trimmed_cloud);
+    void pcl_to_bird_view(const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg);
+
     // cv::Mat pcl2bird_view()
 
+<<<<<<< Updated upstream
     // image operations
     // void filter_img(const cv::Mat &bird_view_img);
     void pcl_to_bird_view_img(
@@ -69,6 +72,9 @@ class stairDetector{
     void filter_img();
     void cannyEdgeDetection(const cv::Mat &input_image, cv::Mat &edge);
 
+=======
+    void filter_img(const cv::Mat &bird_view_img);
+>>>>>>> Stashed changes
   	// void houghLine(const cv::Mat &edge_image, Lines &lines);
 
     private:
