@@ -75,10 +75,10 @@ public:
   void trim_stitched_pcl(pcl::PCLPointCloud2 &trimmed_cloud);
   void pcl_to_bird_view(const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg);
 
-  // cv::Mat pcl2bird_view()
+  //  Mat pcl2bird_view()
 
   // image operations
-  // void filter_img(const cv::Mat &bird_view_img);
+  // void filter_img(const  Mat &bird_view_img);
   void pcl_to_bird_view_img(
       const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, cv::Mat &img);
   void filter_img(cv::Mat &img);
