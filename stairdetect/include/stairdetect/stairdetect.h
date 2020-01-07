@@ -71,7 +71,7 @@ public:
   // void filter_img(const cv::Mat &bird_view_img);
   void pcl_to_bird_view_img(
       const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, cv::Mat &img);
-  void filter_img();
+  void filter_img(cv::Mat &img);
   void cannyEdgeDetection(const cv::Mat &input_image, cv::Mat &edge);
 
   // void houghLine(const cv::Mat &edge_image, Lines &lines);

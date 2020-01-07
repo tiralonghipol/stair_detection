@@ -52,15 +52,16 @@ void stairDetector::callback_timer_trigger(
         CV_8UC1,
         cv::Scalar(0));
 
-    cv::Mat edge_img(
-        int(_param.img_xy_dim / _param.img_resolution),
-        int(_param.img_xy_dim / _param.img_resolution),
-        CV_8UC1,
-        cv::Scalar(0));
+    // cv::Mat edge_img(
+    //     int(_param.img_xy_dim / _param.img_resolution),
+    //     int(_param.img_xy_dim / _param.img_resolution),
+    //     CV_8UC1,
+    //     cv::Scalar(0));
 
     // convert most recently-received pointcloud to birds-eye-view image
     // std::clock_t c_start = std::clock();
     pcl_to_bird_view_img(_recent_cloud, img);
+    filter_img(img);
     // std::clock_t c_end = std::clock();
     // std::cout << "bime in birds-eye image construction: " << (c_end - c_start)/CLOCKS_PER_SEC << std::endl;
     return;
@@ -119,19 +120,30 @@ void stairDetector::callback_pose(
 void stairDetector::setParam(const stairDetectorParams &param)
 {
     _param = param;
+    _param.canny_kernel_size = _param.canny_kernel_size * 2 + 1;
+    if (_param.canny_kernel_size > 7)
+    {
+        _param.canny_kernel_size = 7;
+    }
+    if (_param.canny_kernel_size < 1)
+    {
+        _param.canny_kernel_size = 1;
+    }
 }
 
 // void filter_img(const cv::Mat &bird_view_img)
-void stairDetector::filter_img()
+void stairDetector::filter_img(cv::Mat &img)
 {
-    Mat image;
+    Mat image, edge_img;
     if (_param.debug)
     {
         // Some code
         ROS_INFO_ONCE("Before try");
         try
         {
-            image = imread("/home/pol/stair_ws/src/stairdetect/imgs_test/top_view_matlab.pgm", CV_LOAD_IMAGE_GRAYSCALE);
+            // image = imread("/home/pol/stair_ws/src/stairdetect/imgs_test/top_view_matlab.pgm", CV_LOAD_IMAGE_GRAYSCALE);
+            image = img;
+            cannyEdgeDetection(image, edge_img);
             ROS_INFO_ONCE("Inside try");
             if (image.empty())
             {
@@ -139,8 +151,8 @@ void stairDetector::filter_img()
                 ROS_INFO_ONCE("After throw (Never executed)");
             }
 
-            imshow("Input Image", image); // Show our image inside it.
-            // waitKey(0);                   // Wait for a keystroke in the window
+            imshow("Edge Image", edge_img); // Show our image inside it.
+            // waitKey(0);                      // Wait for a keystroke in the window
         }
         catch (Mat image)
         {
