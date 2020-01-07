@@ -37,7 +37,7 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
 
     // timers
     _timer_stair_detect = n.createTimer(
-        ros::Duration(_stair_detect_time), & stairDetector::callback_timer_trigger, this);
+        ros::Duration(_stair_detect_time), &stairDetector::callback_timer_trigger, this);
 }
 
 void stairDetector::callback_stitched_pcl(
@@ -49,11 +49,11 @@ void stairDetector::callback_stitched_pcl(
 }
 
 void stairDetector::callback_timer_trigger(
-    const ros::TimerEvent& event)
+    const ros::TimerEvent &event)
 {
     cv::Mat img(
-        int(_param.img_xy_dim / _param.img_resolution), 
-        int(_param.img_xy_dim / _param.img_resolution), 
+        int(_param.img_xy_dim / _param.img_resolution),
+        int(_param.img_xy_dim / _param.img_resolution),
         CV_8UC1,
         cv::Scalar(0));
 
@@ -69,8 +69,8 @@ void stairDetector::callback_timer_trigger(
 }
 
 void stairDetector::pcl_to_bird_view_img(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
-    cv::Mat & img)
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+    cv::Mat &img)
 {
     int img_midpt = int(_param.img_xy_dim / _param.img_resolution) / 2;
 
@@ -81,7 +81,7 @@ void stairDetector::pcl_to_bird_view_img(
     // build birds-eye-view image
     int idx_x = 0;
     int idx_y = 0;
-    for( const pcl::PointXYZ pt: cloud->points )
+    for (const pcl::PointXYZ pt : cloud->points)
     {
         idx_x = int((x_0 - pt.x) / _param.img_resolution) + img_midpt;
         idx_y = int((y_0 - pt.y) / _param.img_resolution) + img_midpt;
@@ -90,21 +90,9 @@ void stairDetector::pcl_to_bird_view_img(
         img.at<uchar>(idx_x, idx_y) = 255;
     }
 
-<<<<<<< Updated upstream
     // make and publish message
-	sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img).toImageMsg();    
+    sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img).toImageMsg();
     _pub_bird_view_img.publish(img_msg);
-=======
-
-
-    return;
-}
-
-void stairDetector::pcl_to_bird_view(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud)
-{
-    
->>>>>>> Stashed changes
     return;
 }
 
@@ -132,9 +120,8 @@ void stairDetector::callback_pose(
 
 void stairDetector::setParam(const stairDetectorParams &param)
 {
-	_param = param;
+    _param = param;
 }
-
 
 // void filter_img(const cv::Mat &bird_view_img)
 void stairDetector::filter_img()
@@ -169,8 +156,8 @@ void stairDetector::filter_img()
 
 void stairDetector::cannyEdgeDetection(const cv::Mat &input_image, cv::Mat &edge)
 {
-	/// Reduce noise with a kernel 3x3
-	cv::blur(input_image, edge, cv::Size(3, 3));
-	/// Canny detector
-	cv::Canny(edge, edge, (double)_param.canny_low_th, (double)_param.canny_low_th * _param.canny_ratio, _param.canny_kernel_size);
+    /// Reduce noise with a kernel 3x3
+    cv::blur(input_image, edge, cv::Size(3, 3));
+    /// Canny detector
+    cv::Canny(edge, edge, (double)_param.canny_low_th, (double)_param.canny_low_th * _param.canny_ratio, _param.canny_kernel_size);
 }
