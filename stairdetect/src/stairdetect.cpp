@@ -18,7 +18,7 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     _pose_Q_size = 40;
 
     // test flag
-    n.getParam("test_mode", _param.debug);
+    n.getParam("debug", _param.debug);
 
     // subscribers
     _sub_stitched_pcl = n.subscribe(
@@ -34,6 +34,7 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     // timers
     _timer_stair_detect = n.createTimer(
         ros::Duration(_stair_detect_time), &stairDetector::callback_timer_trigger, this);
+    setParam(_param);
 }
 
 void stairDetector::callback_stitched_pcl(
@@ -70,13 +71,15 @@ void stairDetector::callback_timer_trigger(
 void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, uint32_t level)
 {
     // high level bools
-    
+    _stairdetect_config = config;
+    // stairDetectorParams new_params;
+
     _param.debug = config.debug;
     // canny
     _param.canny_low_th = config.canny_low_th;
     _param.canny_ratio = config.canny_ratio;
     _param.canny_kernel_size = config.canny_kernel_size;
-    // sd.setParam(param);
+    setParam(_param);
 }
 
 void stairDetector::pcl_to_bird_view_img(
@@ -154,12 +157,12 @@ void stairDetector::filter_img(cv::Mat &img)
     if (_param.debug)
     {
 
-        // namedWindow("Edge Image", CV_WINDOW_AUTOSIZE);
-        // imshow("Edge Image", edge_img); // Show our image inside it.
-        // resizeWindow("Edge Image", 250, 250);
-        // waitKey(1);                     // Wait for a keystroke in the window
-        sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", edge_img).toImageMsg();
-        _pub_bird_view_img.publish(img_msg);
+        namedWindow("Edge Image", CV_WINDOW_NORMAL);
+        imshow("Edge Image", edge_img); // Show our image inside it.
+        resizeWindow("Edge Image", 300, 300);
+        waitKey(0); // Wait for a keystroke in the window
+        // sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", edge_img).toImageMsg();
+        // _pub_bird_view_img.publish(img_msg);
     }
     return;
 }

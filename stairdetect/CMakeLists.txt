@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
 )
 
+find_package(Boost REQUIRED)
 find_package(PCL REQUIRED)
 find_package(OpenCV 3 REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -75,6 +76,8 @@ target_link_libraries(${PROJECT_NAME}
  ${catkin_LIBRARIES}
  ${PCL_LIBRARIES}
  ${OpenCV_LIBRARIES}
+ ${Boost_LIBRARIES} 
+
 )
 
 target_link_libraries(${PROJECT_NAME}_node
