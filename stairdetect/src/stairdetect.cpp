@@ -4,6 +4,9 @@
 stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSize)
 {
 
+    // pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
+    // pcl::PointCloud<pcl::PointXYZ>::Ptr _recent_cloud (new pcl::PointCloud<pcl::PointXYZ>::Ptr);
+
     // dynamic reconfigure
     _dyn_rec_cb = boost::bind(&stairDetector::callback_dyn_reconf, this, _1, _2);
     _dr_srv.setCallback(_dyn_rec_cb);
@@ -58,17 +61,17 @@ void stairDetector::callback_stitched_pcl(
 void stairDetector::callback_timer_trigger(
     const ros::TimerEvent &event)
 {
-    cv::Mat img(
+    Mat img(
         int(_param.img_xy_dim / _param.img_resolution),
         int(_param.img_xy_dim / _param.img_resolution),
         CV_8UC1,
-        cv::Scalar(0));
+        Scalar(0));
 
-    // cv::Mat edge_img(
+    //  Mat edge_img(
     //     int(_param.img_xy_dim / _param.img_resolution),
     //     int(_param.img_xy_dim / _param.img_resolution),
     //     CV_8UC1,
-    //     cv::Scalar(0));
+    //      Scalar(0));
 
     // convert most recently-received pointcloud to birds-eye-view image
     // std::clock_t c_start = std::clock();
@@ -102,7 +105,7 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
 
 void stairDetector::pcl_to_bird_view_img(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
-    cv::Mat &img)
+    Mat &img)
 {
     int img_midpt = int(_param.img_xy_dim / _param.img_resolution) / 2;
 
@@ -167,8 +170,8 @@ void stairDetector::setParam(const stairDetectorParams &param)
     return;
 }
 
-// void filter_img(const cv::Mat &bird_view_img)
-void stairDetector::filter_img(cv::Mat &img)
+// void filter_img(const  Mat &bird_view_img)
+void stairDetector::filter_img(Mat &img)
 {
     Mat image, edge_img, hough_img;
     // image = img;
@@ -180,10 +183,10 @@ void stairDetector::filter_img(cv::Mat &img)
     Lines lines;
     hough_lines(edge_img, lines);
 
-    cv::cvtColor(edge_img, hough_img, CV_GRAY2BGR);
-    // cv::cvtColor(colorMat, greyMat, CV_BGR2GRAY);
+    cvtColor(edge_img, hough_img, CV_GRAY2BGR);
+    //  cvtColor(colorMat, greyMat, CV_BGR2GRAY);
 
-    draw_lines(hough_img, lines, cv::Scalar(255, 0, 0));
+    draw_lines(hough_img, lines, Scalar(255, 0, 0));
 
     if (_param.debug)
     {
@@ -195,7 +198,7 @@ void stairDetector::filter_img(cv::Mat &img)
         // namedWindow("Hough Lines", CV_WINDOW_NORMAL);
         // imshow("Hough Lines", hough_img); // Show our image inside it.
         // resizeWindow("Hough Lines", 300, 300);
-        // waitKey(0); 
+        // waitKey(0);
 
         sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", hough_img).toImageMsg();
         _pub_bird_view_img.publish(img_msg);
@@ -203,16 +206,20 @@ void stairDetector::filter_img(cv::Mat &img)
     return;
 }
 
-void stairDetector::canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge)
+void stairDetector::canny_edge_detect(const Mat &input_image, Mat &edge)
 {
     /// Reduce noise with a kernel 3x3
-    cv::blur(input_image, edge, cv::Size(3, 3));
+    blur(input_image, edge, Size(3, 3));
+    medianBlur(edge, edge, 3 );
     /// Canny detector
-    cv::Canny(edge, edge, (double)_param.canny_low_th, (double)_param.canny_low_th * _param.canny_ratio, _param.canny_kernel_size);
+    Canny(edge, edge,
+          (double)_param.canny_low_th,
+          (double)_param.canny_low_th * _param.canny_ratio,
+          _param.canny_kernel_size);
     return;
 }
 
-void stairDetector::hough_lines(const cv::Mat &edge_image, Lines &lines)
+void stairDetector::hough_lines(const Mat &edge_image, Lines &lines)
 {
     lines.clear();
     if (_param.hough_theta == 0)
@@ -224,7 +231,7 @@ void stairDetector::hough_lines(const cv::Mat &edge_image, Lines &lines)
         _param.hough_rho = 1;
     }
 
-    std::vector<cv::Vec4i> xy_lines;
+    std::vector<Vec4i> xy_lines;
     HoughLinesP(edge_image, xy_lines,
                 (double)_param.hough_rho / 10,
                 (double)_param.hough_theta,
@@ -240,12 +247,12 @@ void stairDetector::hough_lines(const cv::Mat &edge_image, Lines &lines)
     }
 }
 
-void stairDetector::draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color)
+void stairDetector::draw_lines(Mat &image, const Lines &lines, const Scalar &color)
 {
     for (int i = 0; i < lines.size(); i++)
     {
         // std::cout << "Drwing lines: " << lines[i] << std::endl;
-        cv::line(image, lines[i].p1, lines[i].p2, color, 3, 8);
-        // putText(image, std::to_string(lines[i].t), lines[i].p1, cv::FONT_HERSHEY_SIMPLEX, 0.3, cv::Scalar(255, 255, 0));
+        line(image, lines[i].p1, lines[i].p2, color, 3, 8);
+        // putText(image, std::to_string(lines[i].t), lines[i].p1,  FONT_HERSHEY_SIMPLEX, 0.3,  Scalar(255, 255, 0));
     }
 }

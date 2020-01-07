@@ -75,16 +75,16 @@ public:
   void trim_stitched_pcl(pcl::PCLPointCloud2 &trimmed_cloud);
   void pcl_to_bird_view(const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg);
 
-  // cv::Mat pcl2bird_view()
+  //  Mat pcl2bird_view()
 
   // image operations
-  // void filter_img(const cv::Mat &bird_view_img);
+  // void filter_img(const  Mat &bird_view_img);
   void pcl_to_bird_view_img(
-      const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, cv::Mat &img);
-  void filter_img(cv::Mat &img);
-  void canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge);
-  void hough_lines(const cv::Mat &edge_image, Lines &lines);
-  void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
+      const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,  Mat &img);
+  void filter_img( Mat &img);
+  void canny_edge_detect(const  Mat &input_image,  Mat &edge);
+  void hough_lines(const  Mat &edge_image, Lines &lines);
+  void draw_lines( Mat &image, const Lines &lines, const  Scalar &color);
 
 private:
   // subscribers
