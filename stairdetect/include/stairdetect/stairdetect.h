@@ -30,6 +30,9 @@
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
 
+#include <dynamic_reconfigure/server.h>
+#include <stairdetect/StairDetectConfig.h>
+
 using namespace std;
 using namespace cv;
 
@@ -101,6 +104,9 @@ private:
 
   // parameter container
   stairDetectorParams _param;
+
+  // dynamic reconfigure
+  // dynamic_reconfigure::Server<stairdetect::StairDetectConfig> _dr_server;
 
   // pose queue
   int _pose_Q_size;

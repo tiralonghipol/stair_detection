@@ -3,6 +3,9 @@
 
 stairDetectorParams param;
 
+
+
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "stairdetect");
