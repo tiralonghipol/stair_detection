@@ -18,10 +18,13 @@ int main(int argc, char **argv)
     param.debug = true;
     sd->setParam(param);
 
-    dynamic_reconfigure::Server<stairdetect::StairDetectConfig> dr_srv;
-    dynamic_reconfigure::Server<stairdetect::StairDetectConfig>::CallbackType cb;
-    cb = boost::bind(&stairDetector::callback_dyn_reconf, sd, _1, _2);
-    dr_srv.setCallback(cb);
+    // dynamic_reconfigure::Server<stairdetect::StairDetectConfig> dr_srv;
+    // dynamic_reconfigure::Server<stairdetect::StairDetectConfig>::CallbackType cb;
+    // cb = boost::bind(&stairDetector::callback_dyn_reconf, sd, _1, _2);
+    // // dr_srv.waitForService (const std::string &service_name, int32_t timeout)
+    // dr_srv.setCallback(cb);
+    Mat tmp;
+    sd->filter_img(tmp);
 
     ros::spin();
     return 0;

@@ -71,7 +71,7 @@ void stairDetector::callback_timer_trigger(
 void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, uint32_t level)
 {
     // high level bools
-    _stairdetect_config = config;
+    // _stairdetect_config = config;
     // stairDetectorParams new_params;
 
     _param.debug = config.debug;
@@ -79,6 +79,13 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
     _param.canny_low_th = config.canny_low_th;
     _param.canny_ratio = config.canny_ratio;
     _param.canny_kernel_size = config.canny_kernel_size;
+    // hough transform
+    _param.hough_min_line_length = config.hough_min_line_length;
+    _param.hough_max_line_gap = config.hough_max_line_gap;
+    _param.hough_th = config.hough_th;
+    _param.hough_rho = config.hough_rho;
+    _param.hough_theta = config.hough_theta;
+
     setParam(_param);
 }
 
@@ -135,6 +142,8 @@ void stairDetector::callback_pose(
 void stairDetector::setParam(const stairDetectorParams &param)
 {
     _param = param;
+   	_param.hough_theta = _param.hough_theta * PI / 180;
+
     _param.canny_kernel_size = _param.canny_kernel_size * 2 + 1;
     if (_param.canny_kernel_size > 7)
     {
@@ -150,16 +159,34 @@ void stairDetector::setParam(const stairDetectorParams &param)
 // void filter_img(const cv::Mat &bird_view_img)
 void stairDetector::filter_img(cv::Mat &img)
 {
-    Mat image, edge_img;
-    image = img;
-    cannyEdgeDetection(image, edge_img);
+    Mat image, edge_img, hough_img;
+    // image = img;
+    image = imread("/home/pol/stair_ws/src/stairdetect/imgs_test/top_view_matlab.pgm", CV_LOAD_IMAGE_GRAYSCALE);
+    canny_edge_detect(image, edge_img);
+    
+    // edge_img.copyTo(hough_img);
+
+    Lines lines;
+    hough_lines(edge_img,lines);
+
+    cv::cvtColor(edge_img, hough_img, CV_GRAY2BGR);
+    // cv::cvtColor(colorMat, greyMat, CV_BGR2GRAY);
+
+	draw_lines(hough_img, lines, cv::Scalar(255, 0, 0));
+
+
 
     if (_param.debug)
     {
 
         namedWindow("Edge Image", CV_WINDOW_NORMAL);
-        imshow("Edge Image", edge_img); // Show our image inside it.
+        imshow("Edge Image", edge_img); 
         resizeWindow("Edge Image", 300, 300);
+
+        namedWindow("Hough Lines", CV_WINDOW_NORMAL);
+        imshow("Hough Lines", hough_img); // Show our image inside it.
+        resizeWindow("Hough Lines", 300, 300);
+
         waitKey(0); // Wait for a keystroke in the window
         // sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", edge_img).toImageMsg();
         // _pub_bird_view_img.publish(img_msg);
@@ -167,11 +194,49 @@ void stairDetector::filter_img(cv::Mat &img)
     return;
 }
 
-void stairDetector::cannyEdgeDetection(const cv::Mat &input_image, cv::Mat &edge)
+void stairDetector::canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge)
 {
     /// Reduce noise with a kernel 3x3
     cv::blur(input_image, edge, cv::Size(3, 3));
     /// Canny detector
     cv::Canny(edge, edge, (double)_param.canny_low_th, (double)_param.canny_low_th * _param.canny_ratio, _param.canny_kernel_size);
     return;
+}
+
+void stairDetector::hough_lines(const cv::Mat &edge_image, Lines &lines)
+{
+	lines.clear();
+	if (_param.hough_theta == 0)
+	{
+		_param.hough_theta = 1 * PI / 180;
+	}
+	if (_param.hough_rho == 0)
+	{
+		_param.hough_rho = 1;
+	}
+
+	std::vector<cv::Vec4i> xy_lines;
+	HoughLinesP(edge_image, xy_lines,
+				(double)_param.hough_rho / 10,
+				(double)_param.hough_theta,
+				(int)_param.hough_th,
+				(double)_param.hough_min_line_length,
+				(double)_param.hough_max_line_gap);
+
+	for (int i = 0; i < xy_lines.size(); i++)
+	{
+		Line line(xy_lines[i]);
+		line.calPixels(edge_image);
+		lines.push_back(line);
+	}
+}
+
+void stairDetector::draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color)
+{
+	for (int i = 0; i < lines.size(); i++)
+	{
+		// std::cout << "Drwing lines: " << lines[i] << std::endl;
+		cv::line(image, lines[i].p1, lines[i].p2, color, 3, 8);
+		// putText(image, std::to_string(lines[i].t), lines[i].p1, cv::FONT_HERSHEY_SIMPLEX, 0.3, cv::Scalar(255, 255, 0));
+	}
 }
