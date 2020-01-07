@@ -5,7 +5,7 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
 {
     // _recent_cloud = new pcl::PointCloud<pcl::PointXYZ>;
     _recent_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
-    
+
     // dynamic reconfigure
     // _dyn_rec_cb = boost::bind(&stairDetector::callback_dyn_reconf, this, _1, _2);
     // _dr_srv.setCallback(_dyn_rec_cb);
@@ -49,11 +49,11 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     _timer_stair_detect = n.createTimer(
         ros::Duration(_stair_detect_time), &stairDetector::callback_timer_trigger, this);
 
-    // // dynamic reconfigure
-    // _dyn_rec_cb = boost::bind(&stairDetector::callback_dyn_reconf, this, _1, _2);
-    // _dr_srv.setCallback(_dyn_rec_cb);
-
     setParam(_param);
+
+    // // dynamic reconfigure
+    _dyn_rec_cb = boost::bind(&stairDetector::callback_dyn_reconf, this, _1, _2);
+    _dr_srv.setCallback(_dyn_rec_cb);
 }
 
 void stairDetector::callback_stitched_pcl(
@@ -82,23 +82,34 @@ void stairDetector::callback_timer_trigger(
 
 void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, uint32_t level)
 {
+    boost::mutex::scoped_lock l(_mutex);
+
     // high level bools
     // _stairdetect_config = config;
     // stairDetectorParams new_params;
+    ROS_INFO("Reconfigure Request: %s %f %f %d %f %f %f %d %f",
+             config.debug ? "True" : "False",
+             config.canny_low_th,
+             config.canny_ratio,
+             config.canny_kernel_size,
+             config.hough_min_line_length,
+             config.hough_max_line_gap,
+             config.hough_th,
+             config.hough_rho,
+             config.hough_theta);
+    // _param.debug = config.debug;
+    // // canny
+    // _param.canny_low_th = config.canny_low_th;
+    // _param.canny_ratio = config.canny_ratio;
+    // _param.canny_kernel_size = config.canny_kernel_size;
+    // // hough transform
+    // _param.hough_min_line_length = config.hough_min_line_length;
+    // _param.hough_max_line_gap = config.hough_max_line_gap;
+    // _param.hough_th = config.hough_th;
+    // _param.hough_rho = config.hough_rho;
+    // _param.hough_theta = config.hough_theta;
 
-    _param.debug = config.debug;
-    // canny
-    _param.canny_low_th = config.canny_low_th;
-    _param.canny_ratio = config.canny_ratio;
-    _param.canny_kernel_size = config.canny_kernel_size;
-    // hough transform
-    _param.hough_min_line_length = config.hough_min_line_length;
-    _param.hough_max_line_gap = config.hough_max_line_gap;
-    _param.hough_th = config.hough_th;
-    _param.hough_rho = config.hough_rho;
-    _param.hough_theta = config.hough_theta;
-
-    setParam(_param);
+    // setParam(_param);
 }
 
 void stairDetector::pcl_to_bird_view_img(

@@ -1,5 +1,5 @@
 <launch>
-    <arg name="rviz" default="true" />
+    <arg name="rviz" default="false" />
     <node name="stairdetect" pkg="stairdetect" type="stairdetect_node" output="screen"> 
 
         <!-- topic names -->
@@ -27,7 +27,7 @@
 
     </node>
 
-        <!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find stairdetect)/rviz/stair_detect_test.rviz" /> -->
+        <node pkg="rviz" type="rviz" name="rviz" args="-d $(find stairdetect)/rviz/stair_detect_test.rviz" />
 
 </launch>
 

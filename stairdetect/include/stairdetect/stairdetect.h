@@ -37,6 +37,8 @@
 using namespace std;
 using namespace cv;
 
+#include <mutex>
+
 
 struct stairDetectorParams
 {
@@ -123,6 +125,8 @@ private:
   // dynamic reconfigure
   dynamic_reconfigure::Server<stairdetect::StairDetectConfig> _dr_srv;
   dynamic_reconfigure::Server<stairdetect::StairDetectConfig>::CallbackType _dyn_rec_cb;
+  
+  boost::mutex _mutex;
 
 
   // pose queue
