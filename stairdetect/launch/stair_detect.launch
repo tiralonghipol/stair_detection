@@ -7,6 +7,8 @@
         <param name="topic_pose" value="/msf_core/pose" type="str"/>
         <param name="topic_trimmed_pcl" value="trimmed_pcl" type="str"/>
         <param name="topic_bird_eye_img" value="bird_eye_img" type="str"/>
+        <param name="topic_edge_img" value="edge_img" type="str"/>
+        <param name="topic_line_img" value="line_img" type="str"/>
 
         <!-- dynamic parameters-->
         <param name="debug" value="true" type="bool"/>

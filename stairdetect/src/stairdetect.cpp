@@ -14,6 +14,8 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     n.getParam("topic_pose", _topic_pose);
     n.getParam("topic_trimmed_pcl", _topic_trimmed_pcl);
     n.getParam("topic_bird_eye_img", _topic_bird_eye_img);
+    n.getParam("topic_edge_img", _topic_edge_img);
+    n.getParam("topic_line_img", _topic_line_img);
     n.getParam("stair_detect_timing", _stair_detect_time);
 
     // pointcloud trimming parameters
@@ -34,8 +36,12 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
 
     // publishers
     _pub_trimmed_pcl = n.advertise<sensor_msgs::PointCloud2>(_topic_trimmed_pcl, bufSize);
-    image_transport::ImageTransport it(n);
-    _pub_bird_view_img = it.advertise(_topic_bird_eye_img, 1);
+    image_transport::ImageTransport it_0(n);
+    _pub_bird_view_img = it_0.advertise(_topic_bird_eye_img, 1);
+    image_transport::ImageTransport it_1(n);
+    _pub_edge_img = it_1.advertise(_topic_edge_img, 1);
+    image_transport::ImageTransport it_2(n);
+    _pub_line_img = it_2.advertise(_topic_line_img, 1);
 
     // timers
     _timer_stair_detect = n.createTimer(
@@ -64,18 +70,11 @@ void stairDetector::callback_timer_trigger(
         CV_8UC1,
         cv::Scalar(0));
 
-    // cv::Mat edge_img(
-    //     int(_param.img_xy_dim / _param.img_resolution),
-    //     int(_param.img_xy_dim / _param.img_resolution),
-    //     CV_8UC1,
-    //     cv::Scalar(0));
-
     // convert most recently-received pointcloud to birds-eye-view image
-    // std::clock_t c_start = std::clock();
     pcl_to_bird_view_img(_recent_cloud, img);
+
+    // filtering on birds-eye image
     filter_img(img);
-    // std::clock_t c_end = std::clock();
-    // std::cout << "bime in birds-eye image construction: " << (c_end - c_start)/CLOCKS_PER_SEC << std::endl;
     return;
 }
 
@@ -121,10 +120,6 @@ void stairDetector::pcl_to_bird_view_img(
         // img.at<uchar>(idx_y, idx_x)
         img.at<uchar>(idx_x, idx_y) = 255;
     }
-
-    // // make and publish message
-    // sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img).toImageMsg();
-    // _pub_bird_view_img.publish(img_msg);
     return;
 }
 
@@ -170,36 +165,40 @@ void stairDetector::setParam(const stairDetectorParams &param)
 // void filter_img(const cv::Mat &bird_view_img)
 void stairDetector::filter_img(cv::Mat &img)
 {
-    Mat image, edge_img, hough_img;
-    // image = img;
-    image = imread("/home/pol/stair_ws/src/stairdetect/imgs_test/top_view_matlab.pgm", CV_LOAD_IMAGE_GRAYSCALE);
-    canny_edge_detect(image, edge_img);
+    Mat edge_img, hough_img;
 
-    // edge_img.copyTo(hough_img);
+    // edge detection
+    canny_edge_detect(img, edge_img);
 
+    // line detection
     Lines lines;
     hough_lines(edge_img, lines);
-
     cv::cvtColor(edge_img, hough_img, CV_GRAY2BGR);
-    // cv::cvtColor(colorMat, greyMat, CV_BGR2GRAY);
-
     draw_lines(hough_img, lines, cv::Scalar(255, 0, 0));
 
     if (_param.debug)
     {
-
-        // namedWindow("Edge Image", CV_WINDOW_NORMAL);
-        // imshow("Edge Image", edge_img);
-        // resizeWindow("Edge Image", 300, 300);
-
-        // namedWindow("Hough Lines", CV_WINDOW_NORMAL);
-        // imshow("Hough Lines", hough_img); // Show our image inside it.
-        // resizeWindow("Hough Lines", 300, 300);
-        // waitKey(0); 
-
-        sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", hough_img).toImageMsg();
-        _pub_bird_view_img.publish(img_msg);
+        publish_img_msgs(img, edge_img, hough_img);
     }
+    return;
+}
+
+void stairDetector::publish_img_msgs(
+    cv::Mat & img_bird_view,
+    cv::Mat & img_edge,
+    cv::Mat & img_line)
+{
+    // publish birds-eye image
+    sensor_msgs::ImagePtr bird_view_img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img_bird_view).toImageMsg();
+    _pub_bird_view_img.publish(bird_view_img_msg);
+
+    // publish edge image
+    sensor_msgs::ImagePtr edge_img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img_edge).toImageMsg();
+    _pub_edge_img.publish(edge_img_msg);
+
+    // publish line (hugh) image
+    sensor_msgs::ImagePtr line_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", img_line).toImageMsg();
+    _pub_line_img.publish(line_img_msg);
     return;
 }
 

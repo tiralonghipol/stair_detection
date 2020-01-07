@@ -85,6 +85,7 @@ public:
   void canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge);
   void hough_lines(const cv::Mat &edge_image, Lines &lines);
   void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
+  void publish_img_msgs(cv::Mat & img_bird_view, cv::Mat & img_edge, cv::Mat & img_line);
 
 private:
   // subscribers
@@ -94,6 +95,8 @@ private:
   // publishers
   ros::Publisher _pub_trimmed_pcl;
   image_transport::Publisher _pub_bird_view_img;
+  image_transport::Publisher _pub_edge_img;
+  image_transport::Publisher _pub_line_img;
 
   // timers
   ros::Timer _timer_stair_detect;
@@ -103,6 +106,8 @@ private:
   std::string _topic_pose;
   std::string _topic_trimmed_pcl;
   std::string _topic_bird_eye_img;
+  std::string _topic_edge_img;
+  std::string _topic_line_img;
 
   // pointcloud trimming params
   int _xy_lim;
