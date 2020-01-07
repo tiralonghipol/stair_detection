@@ -64,7 +64,6 @@ class stairDetector{
 
     // cv::Mat pcl2bird_view()
 
-<<<<<<< Updated upstream
     // image operations
     // void filter_img(const cv::Mat &bird_view_img);
     void pcl_to_bird_view_img(
@@ -72,9 +71,6 @@ class stairDetector{
     void filter_img();
     void cannyEdgeDetection(const cv::Mat &input_image, cv::Mat &edge);
 
-=======
-    void filter_img(const cv::Mat &bird_view_img);
->>>>>>> Stashed changes
   	// void houghLine(const cv::Mat &edge_image, Lines &lines);
 
     private:
