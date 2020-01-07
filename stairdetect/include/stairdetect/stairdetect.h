@@ -60,6 +60,7 @@ public:
   void callback_stitched_pcl(const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg);
   void callback_pose(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &msg);
   void callback_timer_trigger(const ros::TimerEvent &event);
+  void callback_dyn_reconf(stairdetect::StairDetectConfig &config, uint32_t level);
 
   // other functions
   void trim_stitched_pcl(pcl::PCLPointCloud2 &trimmed_cloud);
@@ -106,7 +107,7 @@ private:
   stairDetectorParams _param;
 
   // dynamic reconfigure
-  // dynamic_reconfigure::Server<stairdetect::StairDetectConfig> _dr_server;
+  stairdetect::StairDetectConfig _stairdetect_config;
 
   // pose queue
   int _pose_Q_size;

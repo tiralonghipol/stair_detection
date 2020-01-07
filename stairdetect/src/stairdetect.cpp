@@ -67,6 +67,18 @@ void stairDetector::callback_timer_trigger(
     return;
 }
 
+void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, uint32_t level)
+{
+    // high level bools
+    
+    _param.debug = config.debug;
+    // canny
+    _param.canny_low_th = config.canny_low_th;
+    _param.canny_ratio = config.canny_ratio;
+    _param.canny_kernel_size = config.canny_kernel_size;
+    // sd.setParam(param);
+}
+
 void stairDetector::pcl_to_bird_view_img(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
     cv::Mat &img)
@@ -90,8 +102,8 @@ void stairDetector::pcl_to_bird_view_img(
     }
 
     // // make and publish message
-    sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img).toImageMsg();
-    _pub_bird_view_img.publish(img_msg);
+    // sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img).toImageMsg();
+    // _pub_bird_view_img.publish(img_msg);
     return;
 }
 
@@ -129,37 +141,25 @@ void stairDetector::setParam(const stairDetectorParams &param)
     {
         _param.canny_kernel_size = 1;
     }
+    return;
 }
 
 // void filter_img(const cv::Mat &bird_view_img)
 void stairDetector::filter_img(cv::Mat &img)
 {
     Mat image, edge_img;
+    image = img;
+    cannyEdgeDetection(image, edge_img);
+
     if (_param.debug)
     {
-        // Some code
-        ROS_INFO_ONCE("Before try");
-        try
-        {
-            // image = imread("/home/pol/stair_ws/src/stairdetect/imgs_test/top_view_matlab.pgm", CV_LOAD_IMAGE_GRAYSCALE);
-            image = img;
-            cannyEdgeDetection(image, edge_img);
-            ROS_INFO_ONCE("Inside try");
-            if (image.empty())
-            {
-                throw image;
-                ROS_INFO_ONCE("After throw (Never executed)");
-            }
 
-            imshow("Edge Image", edge_img); // Show our image inside it.
-            // waitKey(0);                      // Wait for a keystroke in the window
-        }
-        catch (Mat image)
-        {
-            ROS_WARN_ONCE("Exception Caught \n");
-        }
-
-        ROS_WARN_ONCE("After catch (Will be executed) \n");
+        // namedWindow("Edge Image", CV_WINDOW_AUTOSIZE);
+        // imshow("Edge Image", edge_img); // Show our image inside it.
+        // resizeWindow("Edge Image", 250, 250);
+        // waitKey(1);                     // Wait for a keystroke in the window
+        sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", edge_img).toImageMsg();
+        _pub_bird_view_img.publish(img_msg);
     }
     return;
 }
@@ -170,4 +170,5 @@ void stairDetector::cannyEdgeDetection(const cv::Mat &input_image, cv::Mat &edge
     cv::blur(input_image, edge, cv::Size(3, 3));
     /// Canny detector
     cv::Canny(edge, edge, (double)_param.canny_low_th, (double)_param.canny_low_th * _param.canny_ratio, _param.canny_kernel_size);
+    return;
 }
