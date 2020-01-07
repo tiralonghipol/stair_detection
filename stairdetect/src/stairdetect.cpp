@@ -17,10 +17,6 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     // other params
     _pose_Q_size = 40;
 
-    // initialize recent pointcloud
-    // const pcl::PointCloud<pcl::PointXYZ>::Ptr init_pcl;
-    // _recent_cloud = nullptr;
-
     // test flag
     n.getParam("test_mode", _param.debug);
 
@@ -41,7 +37,6 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
 }
 
 void stairDetector::callback_stitched_pcl(
-    // const pcl::PointCloud<pcl::PointXYZ>::ConstPtr & msg)
     const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg)
 {
     _recent_cloud = msg;
@@ -57,14 +52,17 @@ void stairDetector::callback_timer_trigger(
         CV_8UC1,
         cv::Scalar(0));
 
+    cv::Mat edge_img(
+        int(_param.img_xy_dim / _param.img_resolution),
+        int(_param.img_xy_dim / _param.img_resolution),
+        CV_8UC1,
+        cv::Scalar(0));
+
     // convert most recently-received pointcloud to birds-eye-view image
     // std::clock_t c_start = std::clock();
     pcl_to_bird_view_img(_recent_cloud, img);
     // std::clock_t c_end = std::clock();
     // std::cout << "bime in birds-eye image construction: " << (c_end - c_start)/CLOCKS_PER_SEC << std::endl;
-
-    // image processing....
-    // stairDetector::filter_img();
     return;
 }
 
@@ -90,7 +88,7 @@ void stairDetector::pcl_to_bird_view_img(
         img.at<uchar>(idx_x, idx_y) = 255;
     }
 
-    // make and publish message
+    // // make and publish message
     sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img).toImageMsg();
     _pub_bird_view_img.publish(img_msg);
     return;
