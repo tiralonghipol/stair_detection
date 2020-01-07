@@ -14,11 +14,18 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   geometry_msgs
   message_generation
+  dynamic_reconfigure
 )
 
 find_package(PCL REQUIRED)
 find_package(OpenCV 3 REQUIRED)
 find_package(Eigen3 REQUIRED)
+
+
+# dynamic reconfigure
+generate_dynamic_reconfigure_options(
+    cfg/StairDetect.cfg
+)
 
 # Generate messages in the 'msg' folder
 #add_message_files(
@@ -42,7 +49,7 @@ generate_messages(
 catkin_package(
   INCLUDE_DIRS include ${PCL_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS} ${Eigen3_INCLUDE_DIRS}
   LIBRARIES ${PROJECT_NAME}
-  CATKIN_DEPENDS roscpp std_msgs geometry_msgs message_runtime sensor_msgs
+  CATKIN_DEPENDS roscpp std_msgs geometry_msgs message_runtime sensor_msgs dynamic_reconfigure
   DEPENDS PCL OpenCV Eigen3
 )
 

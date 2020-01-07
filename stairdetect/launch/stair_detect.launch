@@ -8,8 +8,11 @@
         <param name="topic_trimmed_pcl" value="trimmed_pcl" type="str"/>
         <param name="topic_bird_eye_img" value="bird_eye_img" type="str"/>
 
-        <!-- test mode flag -->
-        <param name="test_mode" value="true" type="bool"/>
+        <!-- dynamic parameters-->
+        <param name="debug" value="true" type="bool"/>
+        <param name="canny_low_th" value="20" type="double"/>
+        <param name="canny_ratio" value="10" type="double"/>
+        <param name="canny_kernel_size" value="3" type="int"/>
 
         <!-- timing -->
         <param name="stair_detect_timing" value="5.0" type="double"/> 

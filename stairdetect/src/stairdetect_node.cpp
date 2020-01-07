@@ -11,7 +11,7 @@ int main(int argc, char **argv)
     stairDetector sd = stairDetector(nh, "stair_detector_node", 100);
     param.debug = true;
     sd.setParam(param);    
-    // 
+    
     ros::spin();
     return 0;
 }
