@@ -22,6 +22,11 @@
         <param name="hough_rho" value="5" type="int"/>
         <param name="hough_theta" value="1" type="double"/>
 
+
+        <!-- specify which type of line detection -->
+        <param name="line_detection_method" value="hough" type="str"/>
+        <!-- <param name="line_detection_method" value="lsd" type="str"/> -->
+
         <!-- timing -->
         <param name="stair_detect_timing" value="5.0" type="double"/> 
 

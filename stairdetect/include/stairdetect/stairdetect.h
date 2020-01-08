@@ -45,12 +45,23 @@ struct stairDetectorParams
   double canny_low_th = 10;
   double canny_ratio = 20;
   int canny_kernel_size = 1;
+
   // hough transfrom
   double hough_min_line_length = 50; // pixel distance
   double hough_max_line_gap = 15;    // pixel distance
   double hough_th = 20;
   int hough_rho = 8;
   double hough_theta = 1; // angle
+
+  // line segment detection 
+  // https://codeutils.xyz/OpenCV3.3.0/dd/d1a/group__imgproc__feature.html#ga6b2ad2353c337c42551b521a73eeae7d
+  double lsd_scale = 0.8;
+  double lsd_sigma_scale = 0.6;
+  double lsd_quant = 2.0;
+  double lsd_angle_th = 22.5;
+  double lsd_log_eps = 0.0;
+  double lsd_density_th = 0.7;
+  int lsd_n_bins = 1024;
 
   // pcl to img params
   // THESE SHOULD PROBABLY COME FROM LIDAR_STITCH_PARAMS
@@ -65,7 +76,6 @@ public:
   void setParam(const stairDetectorParams &param);
 
   // callbacks
-  // void callback_stitched_pcl(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr & msg);
   void callback_stitched_pcl(const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg);
   void callback_pose(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &msg);
   void callback_timer_trigger(const ros::TimerEvent &event);
@@ -75,15 +85,13 @@ public:
   void trim_stitched_pcl(pcl::PCLPointCloud2 &trimmed_cloud);
   void pcl_to_bird_view(const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg);
 
-  //  Mat pcl2bird_view()
-
   // image operations
-  // void filter_img(const  Mat &bird_view_img);
   void pcl_to_bird_view_img(
       const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, cv::Mat &img);
   void filter_img(cv::Mat &img);
   void canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge);
-  void hough_lines(const cv::Mat &edge_image, Lines &lines);
+  void hough_lines(const cv::Mat & img_in, Lines &lines);
+  void lsd_lines(const cv::Mat & img_in, Lines & lines);
   void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
   void publish_img_msgs(cv::Mat & img_bird_view, cv::Mat & img_edge, cv::Mat & img_line);
 
@@ -109,6 +117,9 @@ private:
   std::string _topic_edge_img;
   std::string _topic_line_img;
 
+  // specification of line-detection method
+  std::string _line_detection_method;
+
   // pointcloud trimming params
   int _xy_lim;
   int _z_lim;
@@ -123,7 +134,6 @@ private:
   // dynamic reconfigure
   dynamic_reconfigure::Server<stairdetect::StairDetectConfig> _dr_srv;
   dynamic_reconfigure::Server<stairdetect::StairDetectConfig>::CallbackType _dyn_rec_cb;
-
 
   // pose queue
   int _pose_Q_size;
