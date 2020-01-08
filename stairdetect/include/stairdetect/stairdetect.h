@@ -37,21 +37,19 @@
 using namespace std;
 using namespace cv;
 
-#include <mutex>
-
 
 struct stairDetectorParams
 {
   bool debug;
   // canny
-  double canny_low_th = 10;
+  double canny_low_th = 20;
   double canny_ratio = 20;
   int canny_kernel_size = 1;
   // hough transfrom
   double hough_min_line_length = 50; // pixel distance
-  double hough_max_line_gap = 15;    // pixel distance
+  double hough_max_line_gap = 10;    // pixel distance
   double hough_th = 20;
-  int hough_rho = 8;
+  int hough_rho = 5;
   double hough_theta = 1; // angle
 
   // pcl to img params
@@ -123,10 +121,8 @@ private:
   stairDetectorParams _param;
 
   // dynamic reconfigure
-  dynamic_reconfigure::Server<stairdetect::StairDetectConfig> _dr_srv;
-  dynamic_reconfigure::Server<stairdetect::StairDetectConfig>::CallbackType _dyn_rec_cb;
-  
-  boost::mutex _mutex;
+  // dynamic_reconfigure::Server<stairdetect::StairDetectConfig> _dr_srv;
+  // dynamic_reconfigure::Server<stairdetect::StairDetectConfig>::CallbackType _dyn_rec_cb;
 
 
   // pose queue

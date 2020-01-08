@@ -6,10 +6,6 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     // _recent_cloud = new pcl::PointCloud<pcl::PointXYZ>;
     _recent_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
 
-    // dynamic reconfigure
-    // _dyn_rec_cb = boost::bind(&stairDetector::callback_dyn_reconf, this, _1, _2);
-    // _dr_srv.setCallback(_dyn_rec_cb);
-
     // get params from .launch file
     // topics
     n.getParam("topic_stitched_pointcloud", _topic_stitched_pcl);
@@ -50,10 +46,6 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
         ros::Duration(_stair_detect_time), &stairDetector::callback_timer_trigger, this);
 
     setParam(_param);
-
-    // // dynamic reconfigure
-    _dyn_rec_cb = boost::bind(&stairDetector::callback_dyn_reconf, this, _1, _2);
-    _dr_srv.setCallback(_dyn_rec_cb);
 }
 
 void stairDetector::callback_stitched_pcl(
@@ -82,7 +74,6 @@ void stairDetector::callback_timer_trigger(
 
 void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, uint32_t level)
 {
-    boost::mutex::scoped_lock l(_mutex);
 
     // high level bools
     // _stairdetect_config = config;

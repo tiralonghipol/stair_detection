@@ -1,5 +1,5 @@
 <launch>
-  <arg name="use_sim_time" default="false"/>
+  <!-- <arg name="use_sim_time" default="true"/> -->
   <include file="$(find lidar_stitch)/launch/lidar_stitch.launch">
   </include>
   <include file="$(find stairdetect)/launch/stair_detect.launch">

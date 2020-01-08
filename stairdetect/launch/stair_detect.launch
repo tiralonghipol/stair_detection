@@ -1,6 +1,6 @@
 <launch>
     <arg name="rviz" default="false" />
-    <node name="stairdetect" pkg="stairdetect" type="stairdetect_node" output="screen"> 
+    <node name="stairdetect" pkg="stairdetect" type="stairdetect_node" clear_params="true" output="screen"> 
 
         <!-- topic names -->
         <param name="topic_stitched_pointcloud" value="/lidar_stitch/points_stitched" type="str"/>
@@ -12,12 +12,12 @@
 
         <!-- dynamic parameters-->
         <param name="debug" value="true" type="bool"/>
-        <param name="canny_low_th" value="2" type="double"/>
-        <param name="canny_ratio" value="2" type="double"/>
-        <param name="canny_kernel_size" value="3" type="int"/>
+        <param name="canny_low_th" value="20" type="double"/>
+        <param name="canny_ratio" value="20" type="double"/>
+        <param name="canny_kernel_size" value="1" type="int"/>
 
-        <param name="hough_min_line_length" value="25" type="double"/>
-        <param name="hough_max_line_gap" value="20" type="double"/>
+        <param name="hough_min_line_length" value="50" type="double"/>
+        <param name="hough_max_line_gap" value="10" type="double"/>
         <param name="hough_threshold" value="20" type="double"/>
         <param name="hough_rho" value="5" type="int"/>
         <param name="hough_theta" value="1" type="double"/>
@@ -27,7 +27,7 @@
 
     </node>
 
-        <node pkg="rviz" type="rviz" name="rviz" args="-d $(find stairdetect)/rviz/stair_detect_test.rviz" />
+        <!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find stairdetect)/rviz/stair_detect_test.rviz" /> -->
 
 </launch>
 
