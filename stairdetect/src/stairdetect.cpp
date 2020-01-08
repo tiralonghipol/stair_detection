@@ -3,6 +3,7 @@
 
 stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSize)
 {
+    _recent_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
 
     // dynamic reconfigure
     _dyn_rec_cb = boost::bind(&stairDetector::callback_dyn_reconf, this, _1, _2);
@@ -17,6 +18,7 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     n.getParam("topic_edge_img", _topic_edge_img);
     n.getParam("topic_line_img", _topic_line_img);
     n.getParam("stair_detect_timing", _stair_detect_time);
+    n.getParam("line_detection_method", _line_detection_method);
 
     // pointcloud trimming parameters
     _xy_lim = 10;
@@ -165,20 +167,34 @@ void stairDetector::setParam(const stairDetectorParams &param)
 // void filter_img(const cv::Mat &bird_view_img)
 void stairDetector::filter_img(cv::Mat &img)
 {
-    Mat edge_img, hough_img;
+    // Mat edge_img, hough_img;
+    Mat edge_img, line_img;
 
     // edge detection
     canny_edge_detect(img, edge_img);
 
     // line detection
     Lines lines;
-    hough_lines(edge_img, lines);
-    cv::cvtColor(edge_img, hough_img, CV_GRAY2BGR);
-    draw_lines(hough_img, lines, cv::Scalar(255, 0, 0));
+    if( _line_detection_method == "hough" )
+    {
+        hough_lines(edge_img, lines);
+    } 
+    else if ( _line_detection_method == "lsd" )
+    {
+        lsd_lines(edge_img, lines);
+    }
+    else 
+    {
+        ROS_WARN("LINE DETECTION ALGORITHM SPECIFIED DOES NOT EXIST (must be hough or lsd)");
+    }
+
+    // plot lines on image
+    cv::cvtColor(edge_img, line_img, CV_GRAY2BGR);
+    draw_lines(line_img, lines, cv::Scalar(255, 0, 0));
 
     if (_param.debug)
     {
-        publish_img_msgs(img, edge_img, hough_img);
+        publish_img_msgs(img, edge_img, line_img);
     }
     return;
 }
@@ -196,7 +212,7 @@ void stairDetector::publish_img_msgs(
     sensor_msgs::ImagePtr edge_img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img_edge).toImageMsg();
     _pub_edge_img.publish(edge_img_msg);
 
-    // publish line (hugh) image
+    // publish line image
     sensor_msgs::ImagePtr line_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", img_line).toImageMsg();
     _pub_line_img.publish(line_img_msg);
     return;
@@ -209,6 +225,14 @@ void stairDetector::canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge)
     /// Canny detector
     cv::Canny(edge, edge, (double)_param.canny_low_th, (double)_param.canny_low_th * _param.canny_ratio, _param.canny_kernel_size);
     return;
+}
+
+void stairDetector::draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color)
+{
+    for (int i = 0; i < lines.size(); i++)
+    {
+        cv::line(image, lines[i].p1, lines[i].p2, color, 3, 8);
+    }
 }
 
 void stairDetector::hough_lines(const cv::Mat &edge_image, Lines &lines)
@@ -237,14 +261,30 @@ void stairDetector::hough_lines(const cv::Mat &edge_image, Lines &lines)
         line.calPixels(edge_image);
         lines.push_back(line);
     }
+    return;
 }
 
-void stairDetector::draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color)
+void stairDetector::lsd_lines(const cv::Mat & img_in, Lines & lines) 
 {
-    for (int i = 0; i < lines.size(); i++)
+    vector<Vec4i> xy_lines;
+    Ptr<LineSegmentDetector> lsd = createLineSegmentDetector(
+        LSD_REFINE_STD,
+        _param.lsd_scale,
+        _param.lsd_sigma_scale,
+        _param.lsd_quant,
+        _param.lsd_angle_th,
+        _param.lsd_log_eps,
+        _param.lsd_density_th,
+        _param.lsd_n_bins);
+    lsd->detect(img_in, xy_lines);
+
+    for( int i = 0; i < xy_lines.size(); i++ ) 
     {
-        // std::cout << "Drwing lines: " << lines[i] << std::endl;
-        cv::line(image, lines[i].p1, lines[i].p2, color, 3, 8);
-        // putText(image, std::to_string(lines[i].t), lines[i].p1, cv::FONT_HERSHEY_SIMPLEX, 0.3, cv::Scalar(255, 255, 0));
+        Line line(xy_lines[i]);
+        line.calPixels(img_in);
+        lines.push_back(line);
     }
+    return;
 }
+
+
