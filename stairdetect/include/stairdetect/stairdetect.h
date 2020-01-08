@@ -67,6 +67,9 @@ struct stairDetectorParams
   // THESE SHOULD PROBABLY COME FROM LIDAR_STITCH_PARAMS
   double img_xy_dim = 25;
   double img_resolution = 0.02;
+
+  // filter
+  double filter_slope_hist_bin_width = 20;
 };
 
 class stairDetector
@@ -94,6 +97,9 @@ public:
   void lsd_lines(const cv::Mat & img_in, Lines & lines);
   void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
   void publish_img_msgs(cv::Mat & img_bird_view, cv::Mat & img_edge, cv::Mat & img_line);
+
+  void filter_lines_by_slope_hist(const Lines &input_lines, Lines &filtered_lines);
+
 
 private:
   // subscribers
