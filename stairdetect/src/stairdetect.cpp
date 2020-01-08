@@ -13,6 +13,8 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     n.getParam("topic_bird_eye_img", _topic_bird_eye_img);
     n.getParam("topic_edge_img", _topic_edge_img);
     n.getParam("topic_line_img", _topic_line_img);
+    n.getParam("topic_filtered_line_img", _topic_filtered_line_img);
+
     n.getParam("stair_detect_timing", _stair_detect_time);
     n.getParam("line_detection_method", _line_detection_method);
 
@@ -40,6 +42,9 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     _pub_edge_img = it_1.advertise(_topic_edge_img, 1);
     image_transport::ImageTransport it_2(n);
     _pub_line_img = it_2.advertise(_topic_line_img, 1);
+    image_transport::ImageTransport it_3(n);
+    _pub_filtered_line_img = it_3.advertise(_topic_filtered_line_img, 1);
+    // show final result of filtering on this topic
 
     // timers
     _timer_stair_detect = n.createTimer(
@@ -101,6 +106,8 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
     _param.lsd_log_eps = config.lsd_log_eps;
     _param.lsd_density_th = config.lsd_density_th;
 
+    _param.filter_slope_hist_bin_width = config.filter_slope_hist_bin_width;
+
     setParam(_param);
 }
 
@@ -154,7 +161,7 @@ void stairDetector::setParam(const stairDetectorParams &param)
 {
     _param = param;
     _param.hough_theta = _param.hough_theta * PI / 180;
-
+    _param.filter_slope_hist_bin_width = _param.filter_slope_hist_bin_width * PI / 180;
     _param.canny_kernel_size = _param.canny_kernel_size * 2 + 1;
     if (_param.canny_kernel_size > 7)
     {
@@ -197,22 +204,24 @@ void stairDetector::filter_img(cv::Mat &img)
     draw_lines(line_img, lines, cv::Scalar(255, 0, 0));
 
     Lines filtered_lines;
-    // filter_lines_by_slope_hist(lines, filtered_lines);
 
-    // draw_lines(filtered_line_img, filtered_lines, cv::Scalar(255, 0, 0));
+    filter_lines_by_slope_hist(lines, filtered_lines);
+    draw_lines(filtered_line_img, filtered_lines, cv::Scalar(0, 255, 0));
 
     if (_param.debug)
     {
-        publish_img_msgs(img, edge_img, line_img);
-        // publish_img_msgs(img, line_img, filtered_line_img);
+        // publish_img_msgs(img, edge_img, line_img);
+        publish_img_msgs(img, edge_img, line_img, filtered_line_img);
     }
+
     return;
 }
 
 void stairDetector::publish_img_msgs(
     cv::Mat &img_bird_view,
     cv::Mat &img_edge,
-    cv::Mat &img_line)
+    cv::Mat &img_line,
+    cv::Mat &img_line_filtered)
 {
     // publish birds-eye image
     sensor_msgs::ImagePtr bird_view_img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img_bird_view).toImageMsg();
@@ -225,14 +234,17 @@ void stairDetector::publish_img_msgs(
     // publish line image
     sensor_msgs::ImagePtr line_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", img_line).toImageMsg();
     _pub_line_img.publish(line_img_msg);
+
+    sensor_msgs::ImagePtr filtered_line_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", img_line_filtered).toImageMsg();
+    _pub_filtered_line_img.publish(filtered_line_img_msg);
     return;
 }
 
 void stairDetector::canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge)
 {
     /// Reduce noise with a kernel 3x3
-    // cv::blur(input_image, edge, cv::Size(3, 3));
-    cv::medianBlur(input_image, edge, 3);
+    cv::blur(input_image, edge, cv::Size(3, 3));
+    // cv::medianBlur(input_image, edge, 3);
     /// Canny detector
     cv::Canny(edge, edge, (double)_param.canny_low_th, (double)_param.canny_low_th * _param.canny_ratio, _param.canny_kernel_size);
     return;

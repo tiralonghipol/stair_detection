@@ -37,7 +37,6 @@
 using namespace std;
 using namespace cv;
 
-
 struct stairDetectorParams
 {
   bool debug;
@@ -53,7 +52,7 @@ struct stairDetectorParams
   int hough_rho = 8;
   double hough_theta = 1; // angle
 
-  // line segment detection 
+  // line segment detection
   // https://codeutils.xyz/OpenCV3.3.0/dd/d1a/group__imgproc__feature.html#ga6b2ad2353c337c42551b521a73eeae7d
   double lsd_scale = 0.8;
   double lsd_sigma_scale = 0.6;
@@ -93,13 +92,12 @@ public:
       const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, cv::Mat &img);
   void filter_img(cv::Mat &img);
   void canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge);
-  void hough_lines(const cv::Mat & img_in, Lines &lines);
-  void lsd_lines(const cv::Mat & img_in, Lines & lines);
+  void hough_lines(const cv::Mat &img_in, Lines &lines);
+  void lsd_lines(const cv::Mat &img_in, Lines &lines);
   void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
-  void publish_img_msgs(cv::Mat & img_bird_view, cv::Mat & img_edge, cv::Mat & img_line);
+  void publish_img_msgs(cv::Mat &img_bird_view, cv::Mat &img_edge, cv::Mat &img_line, cv::Mat &img_line_filtered);
 
   void filter_lines_by_slope_hist(const Lines &input_lines, Lines &filtered_lines);
-
 
 private:
   // subscribers
@@ -111,6 +109,7 @@ private:
   image_transport::Publisher _pub_bird_view_img;
   image_transport::Publisher _pub_edge_img;
   image_transport::Publisher _pub_line_img;
+  image_transport::Publisher _pub_filtered_line_img;
 
   // timers
   ros::Timer _timer_stair_detect;
@@ -122,6 +121,7 @@ private:
   std::string _topic_bird_eye_img;
   std::string _topic_edge_img;
   std::string _topic_line_img;
+  std::string _topic_filtered_line_img;
 
   // specification of line-detection method
   std::string _line_detection_method;
