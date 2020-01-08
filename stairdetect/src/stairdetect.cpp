@@ -5,9 +5,6 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
 {
     _recent_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
 
-    // dynamic reconfigure
-    _dyn_rec_cb = boost::bind(&stairDetector::callback_dyn_reconf, this, _1, _2);
-    _dr_srv.setCallback(_dyn_rec_cb);
 
     // get params from .launch file
     // topics
@@ -49,9 +46,9 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     _timer_stair_detect = n.createTimer(
         ros::Duration(_stair_detect_time), &stairDetector::callback_timer_trigger, this);
 
-    // // dynamic reconfigure
-    // _dyn_rec_cb = boost::bind(&stairDetector::callback_dyn_reconf, this, _1, _2);
-    // _dr_srv.setCallback(_dyn_rec_cb);
+    // dynamic reconfigure
+    _dyn_rec_cb = boost::bind(&stairDetector::callback_dyn_reconf, this, _1, _2);
+    _dr_srv.setCallback(_dyn_rec_cb);
 
     setParam(_param);
 }
@@ -85,7 +82,7 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
     // high level bools
     // _stairdetect_config = config;
     // stairDetectorParams new_params;
-
+    ROS_INFO("Reconfigure Triggered");
     _param.debug = config.debug;
     // canny
     _param.canny_low_th = config.canny_low_th;
@@ -221,7 +218,8 @@ void stairDetector::publish_img_msgs(
 void stairDetector::canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge)
 {
     /// Reduce noise with a kernel 3x3
-    cv::blur(input_image, edge, cv::Size(3, 3));
+    // cv::blur(input_image, edge, cv::Size(3, 3));
+    cv::medianBlur(input_image, edge,  3);
     /// Canny detector
     cv::Canny(edge, edge, (double)_param.canny_low_th, (double)_param.canny_low_th * _param.canny_ratio, _param.canny_kernel_size);
     return;

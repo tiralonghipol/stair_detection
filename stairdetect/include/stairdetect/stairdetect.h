@@ -42,8 +42,8 @@ struct stairDetectorParams
 {
   bool debug;
   // canny
-  double canny_low_th = 10;
-  double canny_ratio = 20;
+  double canny_low_th = 50;
+  double canny_ratio = 50;
   int canny_kernel_size = 1;
 
   // hough transfrom
