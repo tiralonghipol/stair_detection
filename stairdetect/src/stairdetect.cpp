@@ -67,11 +67,11 @@ void stairDetector::callback_stitched_pcl(
 void stairDetector::callback_timer_trigger(
     const ros::TimerEvent &event)
 {
-    cv::Mat img(
+    Mat img(
         int(_param.img_xy_dim / _param.img_resolution),
         int(_param.img_xy_dim / _param.img_resolution),
         CV_8UC1,
-        cv::Scalar(0));
+        Scalar(0));
 
     // convert most recently-received pointcloud to birds-eye-view image
     pcl_to_bird_view_img(_recent_cloud, img);
@@ -175,7 +175,7 @@ void stairDetector::setParam(const stairDetectorParams &param)
 void stairDetector::filter_img(cv::Mat &img)
 {
     // Mat edge_img, hough_img;
-    Mat edge_img, line_img, filtered_line_img;
+    Mat edge_img, blurred_img, line_img, filtered_line_img;
 
     // edge detection
     // canny_edge_detect(img, edge_img);
@@ -188,8 +188,11 @@ void stairDetector::filter_img(cv::Mat &img)
     imshow("after threshold", edge_img);
     waitKey(30);
 
-    // skel_filter(edge_img);
-
+    // blur(edge_img, edge_img, Size(3, 3));
+    // bilateralFilter(edge_img, blurred_img, 3, 500, 250);
+    // medianBlur(edge_img, edge_img, 3);
+    // imshow("after edge detection", edge_img);
+    // waitKey(30);
     // cvtColor(edge_img, edge_img, CV_BINA);
     // imshow("after skel", edge_img);
     // waitKey(30);
@@ -210,14 +213,18 @@ void stairDetector::filter_img(cv::Mat &img)
     }
 
     // plot lines on image
-    cv::cvtColor(edge_img, line_img, CV_GRAY2BGR);
-    cv::cvtColor(edge_img, filtered_line_img, CV_GRAY2BGR);
-    draw_lines(line_img, lines, cv::Scalar(255, 0, 0));
+    cvtColor(edge_img, line_img, CV_GRAY2BGR);
+    cvtColor(edge_img, filtered_line_img, CV_GRAY2BGR);
+    draw_lines(line_img, lines, Scalar(255, 0, 0));
+
+    imshow("after hough", line_img);
+    waitKey(30);
 
     Lines filtered_lines;
 
-    filter_lines_by_slope_hist(lines, filtered_lines);
-    draw_lines(filtered_line_img, filtered_lines, cv::Scalar(0, 255, 0));
+    // filter_lines_by_slope_hist(lines, filtered_lines);
+    cluster_by_kmeans(line_img, lines);
+    draw_lines(filtered_line_img, filtered_lines, Scalar(0, 255, 0));
 
     if (_param.debug)
     {
@@ -253,10 +260,9 @@ void stairDetector::publish_img_msgs(
 void stairDetector::canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge)
 {
     /// Reduce noise with a kernel 3x3
-    cv::blur(input_image, edge, cv::Size(3, 3));
-    // cv::medianBlur(input_image, edge, 3);
+    blur(input_image, edge, Size(3, 3));
     /// Canny detector
-    cv::Canny(edge, edge, (double)_param.canny_low_th, (double)_param.canny_low_th * _param.canny_ratio, _param.canny_kernel_size);
+    Canny(edge, edge, (double)_param.canny_low_th, (double)_param.canny_low_th * _param.canny_ratio, _param.canny_kernel_size);
     return;
 }
 
@@ -264,7 +270,7 @@ void stairDetector::draw_lines(cv::Mat &image, const Lines &lines, const cv::Sca
 {
     for (int i = 0; i < lines.size(); i++)
     {
-        cv::line(image, lines[i].p1, lines[i].p2, color, 1, 8);
+        line(image, lines[i].p1, lines[i].p2, color, 2, 8);
     }
 }
 
@@ -280,7 +286,7 @@ void stairDetector::hough_lines(const cv::Mat &edge_image, Lines &lines)
         _param.hough_rho = 1;
     }
 
-    std::vector<cv::Vec4i> xy_lines;
+    std::vector<Vec4i> xy_lines;
     HoughLinesP(edge_image, xy_lines,
                 (double)_param.hough_rho / 10,
                 (double)_param.hough_theta,
@@ -294,6 +300,7 @@ void stairDetector::hough_lines(const cv::Mat &edge_image, Lines &lines)
         line.calPixels(edge_image);
         lines.push_back(line);
     }
+    ROS_INFO_ONCE("Found %d lines", lines.size());
     return;
 }
 
@@ -363,50 +370,48 @@ void stairDetector::filter_lines_by_slope_hist(const Lines &input_lines, Lines &
         slope_hist_list[id].push_back(i);
     }
 
-    // print histogram value
-    // for (int i = 0; i < slope_hist.size(); i++) {
-    // 	std::cout << slope_hist[i] << std::endl;
-    // }
-
     // calcuate the maximum frequency angle
     int max_id = std::distance(slope_hist.begin(), std::max_element(slope_hist.begin(), slope_hist.end()));
     if (_param.debug)
     {
-        std::cout << "Maximum frequency is between angle: "
-                  << max_id * bin_width * 180 / PI << " and "
-                  << (max_id + 1) * bin_width * 180 / PI << std::endl;
+        ROS_INFO("Maximum frequency is between angle: %f and %f ",
+                 max_id * bin_width * 180 / PI,
+                 (max_id + 1) * bin_width * 180 / PI);
     }
 
-    // std::cout << "Which has totoal line: " << slope_hist_list[max_id].size() <<
-    // std::endl;
     // extract the filtered lines
-
-    // Lines filtered_lines;
     for (int i = 0; i < slope_hist_list[max_id].size(); i++)
     {
         int id = slope_hist_list[max_id][i];
         filtered_lines.push_back(input_lines[id]);
     }
+    ROS_INFO_ONCE("Input: %d | Output: %d lines",
+                  input_lines.size(),
+                  filtered_lines.size());
+
     return;
 }
 
-void stairDetector::skel_filter(const cv::Mat &img)
+void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines)
 {
-    cv::Mat skel = img.clone();
-    cv::Mat temp;
-    cv::Mat eroded;
+    int i, n_clusters = 5;
+    Mat m_mid_pts;
+    // Mat bg_img(320, 240, CV_8UC3, Scalar(0, 0, 0));
 
-    cv::Mat element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
+    std::vector<cv::Point> mid_pts;
 
-    bool done;
-    do
+    for (i = 0; i < lines.size(); i++)
     {
-        cv::erode(img, eroded, element);
-        cv::dilate(eroded, temp, element); // temp = open(img)
-        cv::subtract(img, temp, temp);
-        cv::bitwise_or(skel, temp, skel);
-        eroded.copyTo(img);
+        mid_pts.push_back(lines[i].p_mid);
+        circle(img, lines[i].p_mid, 3, Scalar(0, 255, 0), 1, 8);
+    }
+    m_mid_pts = Mat(mid_pts.size(), 2, CV_8UC1, mid_pts.data());
 
-        done = (cv::countNonZero(img) == 0);
-    } while (!done);
+    // double compactness = kmeans(lines., n_clusters, labels,
+    //                             TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 10, 1.0),
+    //                             3, KMEANS_PP_CENTERS, centers);
+
+    imshow("mid points", img);
+    waitKey(30);
+    // cout << mid_pts << endl;
 }
