@@ -96,6 +96,7 @@ public:
   void lsd_lines(const cv::Mat &img_in, Lines &lines);
   void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
   void publish_img_msgs(cv::Mat &img_bird_view, cv::Mat &img_edge, cv::Mat &img_line, cv::Mat &img_line_filtered);
+  void skel_filter(const cv::Mat &img);
 
   void filter_lines_by_slope_hist(const Lines &input_lines, Lines &filtered_lines);
 

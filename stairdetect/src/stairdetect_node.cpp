@@ -8,7 +8,9 @@ int main(int argc, char **argv)
 
     // stairDetector sd = stairDetector(nh, "stair_detector_node", 100);
     stairDetector *sd = new stairDetector(nh, "stair_detector_node", 100);
-
+    Mat tmp;
+    sd->filter_img(tmp);
+    
     ros::spin();
     return 0;
 }

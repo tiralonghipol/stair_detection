@@ -83,10 +83,8 @@ void stairDetector::callback_timer_trigger(
 
 void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, uint32_t level)
 {
-    // high level bools
-    // _stairdetect_config = config;
-    // stairDetectorParams new_params;
     ROS_INFO("Reconfigure Triggered");
+    // high level bools
     _param.debug = config.debug;
     // canny
     _param.canny_low_th = config.canny_low_th;
@@ -105,7 +103,7 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
     _param.lsd_angle_th = config.lsd_angle_th;
     _param.lsd_log_eps = config.lsd_log_eps;
     _param.lsd_density_th = config.lsd_density_th;
-
+    // filter stuff
     _param.filter_slope_hist_bin_width = config.filter_slope_hist_bin_width;
 
     setParam(_param);
@@ -174,14 +172,27 @@ void stairDetector::setParam(const stairDetectorParams &param)
     return;
 }
 
-// void filter_img(const cv::Mat &bird_view_img)
 void stairDetector::filter_img(cv::Mat &img)
 {
     // Mat edge_img, hough_img;
     Mat edge_img, line_img, filtered_line_img;
 
     // edge detection
-    canny_edge_detect(img, edge_img);
+    // canny_edge_detect(img, edge_img);
+    img = imread("/home/pol/stair_ws/src/stairdetect/imgs_test/top_view_matlab.pgm", CV_LOAD_IMAGE_GRAYSCALE);
+    // instead of using canny, use just a biary image
+    // imshow("original", img);
+    // waitKey(30);
+
+    threshold(img, edge_img, 0, 255, THRESH_BINARY);
+    imshow("after threshold", edge_img);
+    waitKey(30);
+
+    // skel_filter(edge_img);
+
+    // cvtColor(edge_img, edge_img, CV_BINA);
+    // imshow("after skel", edge_img);
+    // waitKey(30);
 
     // line detection
     Lines lines;
@@ -210,7 +221,6 @@ void stairDetector::filter_img(cv::Mat &img)
 
     if (_param.debug)
     {
-        // publish_img_msgs(img, edge_img, line_img);
         publish_img_msgs(img, edge_img, line_img, filtered_line_img);
     }
 
@@ -378,4 +388,25 @@ void stairDetector::filter_lines_by_slope_hist(const Lines &input_lines, Lines &
         filtered_lines.push_back(input_lines[id]);
     }
     return;
+}
+
+void stairDetector::skel_filter(const cv::Mat &img)
+{
+    cv::Mat skel = img.clone();
+    cv::Mat temp;
+    cv::Mat eroded;
+
+    cv::Mat element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
+
+    bool done;
+    do
+    {
+        cv::erode(img, eroded, element);
+        cv::dilate(eroded, temp, element); // temp = open(img)
+        cv::subtract(img, temp, temp);
+        cv::bitwise_or(skel, temp, skel);
+        eroded.copyTo(img);
+
+        done = (cv::countNonZero(img) == 0);
+    } while (!done);
 }
