@@ -21,7 +21,6 @@
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
 
-
 #define PI 3.141592654
 
 using namespace std;
@@ -42,8 +41,8 @@ public:
     this->p1 = *new cv::Point(x1, y1);
     this->p2 = *new cv::Point(x2, y2);
     this->center = p1 - p2;
-    this->p_mid.x = (p1.x + p2.x)/2;
-    this->p_mid.y = (p1.y + p2.y)/2;
+    this->p_mid.x = (p1.x + p2.x) / 2;
+    this->p_mid.y = (p1.y + p2.y) / 2;
     this->length = cv::norm(this->p1 - this->p2);
   }
 
@@ -76,13 +75,12 @@ public:
   double length = 0;
   cv::Point p1;
   cv::Point p2;
-  cv::Point p_mid;
+  cv::Point2f p_mid;
   cv::Point center;
   int pixels_num = 0;
   // cv::LineIterator it;
   std::vector<cv::Point> pixels;
 };
 typedef std::vector<Line> Lines;
-
 
 #endif

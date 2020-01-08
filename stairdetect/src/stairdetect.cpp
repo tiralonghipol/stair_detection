@@ -185,8 +185,8 @@ void stairDetector::filter_img(cv::Mat &img)
     // waitKey(30);
 
     threshold(img, edge_img, 0, 255, THRESH_BINARY);
-    imshow("after threshold", edge_img);
-    waitKey(30);
+    // imshow("after threshold", edge_img);
+    // waitKey(30);
 
     // blur(edge_img, edge_img, Size(3, 3));
     // bilateralFilter(edge_img, blurred_img, 3, 500, 250);
@@ -217,8 +217,8 @@ void stairDetector::filter_img(cv::Mat &img)
     cvtColor(edge_img, filtered_line_img, CV_GRAY2BGR);
     draw_lines(line_img, lines, Scalar(255, 0, 0));
 
-    imshow("after hough", line_img);
-    waitKey(30);
+    // imshow("after hough", line_img);
+    // waitKey(30);
 
     Lines filtered_lines;
 
@@ -394,24 +394,56 @@ void stairDetector::filter_lines_by_slope_hist(const Lines &input_lines, Lines &
 
 void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines)
 {
-    int i, n_clusters = 5;
-    Mat m_mid_pts;
+    int i;
+    Mat points, labels, centers;
+
+    const int MAX_CLUSTERS = 5;
+    Scalar colorTab[] =
+        {
+            Scalar(0, 0, 255),
+            Scalar(0, 255, 0),
+            Scalar(255, 100, 100),
+            Scalar(255, 0, 255),
+            Scalar(0, 255, 255)};
+
     // Mat bg_img(320, 240, CV_8UC3, Scalar(0, 0, 0));
 
-    std::vector<cv::Point> mid_pts;
+    std::vector<cv::Point2f> mid_pts;
 
     for (i = 0; i < lines.size(); i++)
     {
-        mid_pts.push_back(lines[i].p_mid);
+        points.push_back(lines[i].p_mid);
         circle(img, lines[i].p_mid, 3, Scalar(0, 255, 0), 1, 8);
     }
-    m_mid_pts = Mat(mid_pts.size(), 2, CV_8UC1, mid_pts.data());
 
-    // double compactness = kmeans(lines., n_clusters, labels,
-    //                             TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 10, 1.0),
-    //                             3, KMEANS_PP_CENTERS, centers);
+    double compactness = kmeans(points, MAX_CLUSTERS, labels,
+                                TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 100, 1.0),
+                                3, KMEANS_PP_CENTERS, centers);
 
-    imshow("mid points", img);
+    // imshow("mid points", img);
+    // waitKey(30);
+    // cout << m_mid_pts << endl;
+    // cout << "-----------------" << endl;
+    // cout << labels << endl;
+    // cout << "-----------------" << endl;
+    // cout << centers << endl;
+    // cout << "-----------------" << endl;
+
+    // img = Scalar::all(0);
+    for (i = 0; i < lines.size(); i++)
+    {
+        int clusterIdx = labels.at<int>(i);
+        Point ipt = points.at<Point2f>(i);
+        circle(img, ipt, 2, colorTab[clusterIdx], FILLED, LINE_AA);
+    }
+    for (i = 0; i < centers.rows; ++i)
+    {
+        Point2f c = centers.at<Point2f>(i);
+        circle(img, c, 40, colorTab[i], 1, LINE_AA);
+    }
+    cout << "Compactness: " << compactness << endl;
+    imshow("clusters", img);
     waitKey(30);
-    // cout << mid_pts << endl;
+
+    return;
 }
