@@ -11,7 +11,7 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     n.getParam("topic_pose", _topic_pose);
     n.getParam("topic_trimmed_pcl", _topic_trimmed_pcl);
     n.getParam("topic_bird_eye_img", _topic_bird_eye_img);
-    n.getParam("topic_edge_img", _topic_edge_img);
+    n.getParam("topic_proc_img", _topic_proc_img);
     n.getParam("topic_line_img", _topic_line_img);
     n.getParam("topic_filtered_line_img", _topic_filtered_line_img);
 
@@ -39,7 +39,7 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     image_transport::ImageTransport it_0(n);
     _pub_bird_view_img = it_0.advertise(_topic_bird_eye_img, 1);
     image_transport::ImageTransport it_1(n);
-    _pub_edge_img = it_1.advertise(_topic_edge_img, 1);
+    _pub_proc_img = it_1.advertise(_topic_proc_img, 1);
     image_transport::ImageTransport it_2(n);
     _pub_line_img = it_2.advertise(_topic_line_img, 1);
     image_transport::ImageTransport it_3(n);
@@ -90,6 +90,10 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
     _param.canny_low_th = config.canny_low_th;
     _param.canny_ratio = config.canny_ratio;
     _param.canny_kernel_size = config.canny_kernel_size;
+    // morphological
+    _param.morph_kernel_size = config.morph_kernel_size;
+    _param.morph_num_iter = config.morph_num_iter;
+
     // hough transform
     _param.hough_min_line_length = config.hough_min_line_length;
     _param.hough_max_line_gap = config.hough_max_line_gap;
@@ -172,23 +176,24 @@ void stairDetector::setParam(const stairDetectorParams &param)
     return;
 }
 
-void stairDetector::filter_img(cv::Mat &img)
+void stairDetector::filter_img(cv::Mat &raw_img)
 {
-    // Mat edge_img, hough_img;
-    Mat edge_img, blurred_img, line_img, filtered_line_img;
+    Mat proc_img, line_img, filtered_line_img;
 
     // edge detection
     // canny_edge_detect(img, edge_img);
-    img = imread("/home/pol/stair_ws/src/stairdetect/imgs_test/top_view_matlab.pgm", CV_LOAD_IMAGE_GRAYSCALE);
+    // img = imread("/home/pol/stair_ws/src/stairdetect/imgs_test/top_view_matlab.pgm", CV_LOAD_IMAGE_GRAYSCALE);
     // instead of using canny, use just a biary image
     // imshow("original", img);
     // waitKey(30);
 
-    threshold(img, edge_img, 0, 255, THRESH_BINARY);
+    // threshold(img, edge_img, 0, 255, THRESH_BINARY);
     // imshow("after threshold", edge_img);
     // waitKey(30);
 
-    // blur(edge_img, edge_img, Size(3, 3));
+    morph_filter(raw_img, proc_img);
+
+    blur(proc_img, proc_img, Size(3, 3));
     // bilateralFilter(edge_img, blurred_img, 3, 500, 250);
     // medianBlur(edge_img, edge_img, 3);
     // imshow("after edge detection", edge_img);
@@ -201,11 +206,11 @@ void stairDetector::filter_img(cv::Mat &img)
     Lines lines;
     if (_line_detection_method == "hough")
     {
-        hough_lines(edge_img, lines);
+        hough_lines(proc_img, lines);
     }
     else if (_line_detection_method == "lsd")
     {
-        lsd_lines(edge_img, lines);
+        lsd_lines(proc_img, lines);
     }
     else
     {
@@ -213,22 +218,18 @@ void stairDetector::filter_img(cv::Mat &img)
     }
 
     // plot lines on image
-    cvtColor(edge_img, line_img, CV_GRAY2BGR);
-    cvtColor(edge_img, filtered_line_img, CV_GRAY2BGR);
+    cvtColor(proc_img, line_img, CV_GRAY2BGR);
     draw_lines(line_img, lines, Scalar(255, 0, 0));
 
-    // imshow("after hough", line_img);
-    // waitKey(30);
-
+    // line clustering
     Lines filtered_lines;
-
     // filter_lines_by_slope_hist(lines, filtered_lines);
     cluster_by_kmeans(line_img, lines);
     draw_lines(filtered_line_img, filtered_lines, Scalar(0, 255, 0));
 
     if (_param.debug)
     {
-        publish_img_msgs(img, edge_img, line_img, filtered_line_img);
+        publish_img_msgs(raw_img, proc_img, line_img, filtered_line_img);
     }
 
     return;
@@ -236,7 +237,7 @@ void stairDetector::filter_img(cv::Mat &img)
 
 void stairDetector::publish_img_msgs(
     cv::Mat &img_bird_view,
-    cv::Mat &img_edge,
+    cv::Mat &img_proc,
     cv::Mat &img_line,
     cv::Mat &img_line_filtered)
 {
@@ -244,14 +245,15 @@ void stairDetector::publish_img_msgs(
     sensor_msgs::ImagePtr bird_view_img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img_bird_view).toImageMsg();
     _pub_bird_view_img.publish(bird_view_img_msg);
 
-    // publish edge image
-    sensor_msgs::ImagePtr edge_img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img_edge).toImageMsg();
-    _pub_edge_img.publish(edge_img_msg);
+    // publish procesed image
+    sensor_msgs::ImagePtr proc_img_msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", img_proc).toImageMsg();
+    _pub_proc_img.publish(proc_img_msg);
 
     // publish line image
     sensor_msgs::ImagePtr line_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", img_line).toImageMsg();
     _pub_line_img.publish(line_img_msg);
 
+    // publish line image with cluster visualization
     sensor_msgs::ImagePtr filtered_line_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", img_line_filtered).toImageMsg();
     _pub_filtered_line_img.publish(filtered_line_img_msg);
     return;
@@ -266,6 +268,31 @@ void stairDetector::canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge)
     return;
 }
 
+void stairDetector::morph_filter(const cv::Mat &img_in, cv::Mat &img_out)
+{
+    // erosion, dilation filters 
+    // https://docs.opencv.org/trunk/d4/d86/group__imgproc__filter.html#gaeb1e0c1033e3f6b891a25d0511362aeb
+    erode(
+        img_in, 
+        img_out, 
+        // Mat(), 
+        Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1), 
+        Point(-1, -1), 
+        _param.morph_num_iter,
+        1,
+        1);
+    dilate(
+        img_out, 
+        img_out, 
+        // Mat(), 
+        Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1), 
+        Point(-1, -1), 
+        _param.morph_num_iter,
+        1,
+        1);
+    return;
+}
+
 void stairDetector::draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color)
 {
     for (int i = 0; i < lines.size(); i++)
@@ -274,7 +301,7 @@ void stairDetector::draw_lines(cv::Mat &image, const Lines &lines, const cv::Sca
     }
 }
 
-void stairDetector::hough_lines(const cv::Mat &edge_image, Lines &lines)
+void stairDetector::hough_lines(const cv::Mat &proc_img, Lines &lines)
 {
     lines.clear();
     if (_param.hough_theta == 0)
@@ -287,7 +314,7 @@ void stairDetector::hough_lines(const cv::Mat &edge_image, Lines &lines)
     }
 
     std::vector<Vec4i> xy_lines;
-    HoughLinesP(edge_image, xy_lines,
+    HoughLinesP(proc_img, xy_lines,
                 (double)_param.hough_rho / 10,
                 (double)_param.hough_theta,
                 (int)_param.hough_th,
@@ -297,7 +324,7 @@ void stairDetector::hough_lines(const cv::Mat &edge_image, Lines &lines)
     for (int i = 0; i < xy_lines.size(); i++)
     {
         Line line(xy_lines[i]);
-        line.calPixels(edge_image);
+        line.calPixels(proc_img);
         lines.push_back(line);
     }
     ROS_INFO_ONCE("Found %d lines", lines.size());
@@ -442,8 +469,8 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines)
         circle(img, c, 40, colorTab[i], 1, LINE_AA);
     }
     cout << "Compactness: " << compactness << endl;
-    imshow("clusters", img);
-    waitKey(30);
+    // imshow("clusters", img);
+    // waitKey(30);
 
     return;
 }
