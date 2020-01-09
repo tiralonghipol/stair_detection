@@ -493,7 +493,7 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines)
     for (i = 0; i < centers.rows; ++i)
     {
         Point2f c = centers.at<Point2f>(i);
-        circle(img, c, 40, colorTab[i], 1, LINE_AA);
+        circle(img, c, 40, colorTab[i], 2, LINE_AA);
     }
     // cout << "Compactness: " << compactness << endl;
     // imshow("clusters", img);
