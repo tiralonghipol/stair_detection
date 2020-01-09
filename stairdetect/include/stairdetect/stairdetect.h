@@ -97,6 +97,7 @@ public:
   void filter_img(cv::Mat &img);
   void canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge);
   void morph_filter(const cv::Mat &img_in, cv::Mat &img_out);
+  void skeleton_filter(const cv::Mat &img_in, cv::Mat &img_out);
   void hough_lines(const cv::Mat &img_in, Lines &lines);
   void lsd_lines(const cv::Mat &img_in, Lines &lines);
   void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
@@ -134,8 +135,6 @@ private:
   std::string _line_detection_method;
 
   // pointcloud trimming params
-  int _xy_lim;
-  int _z_lim;
   double _stair_detect_time;
 
   // reference to most recently-received cloud

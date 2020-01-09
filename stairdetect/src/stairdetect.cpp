@@ -18,10 +18,6 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     n.getParam("stair_detect_timing", _stair_detect_time);
     n.getParam("line_detection_method", _line_detection_method);
 
-    // pointcloud trimming parameters
-    _xy_lim = 10;
-    _z_lim = 1;
-
     // other params
     _pose_Q_size = 40;
 
@@ -42,6 +38,10 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
         sharedPtr = ros::topic::waitForMessage<sensor_msgs::PointCloud2>(_topic_stitched_pcl, ros::Duration(2));
     }
 
+    // dynamic reconfigure
+    _dyn_rec_cb = boost::bind(&stairDetector::callback_dyn_reconf, this, _1, _2);
+    _dr_srv.setCallback(_dyn_rec_cb);
+
     // publishers
     _pub_trimmed_pcl = n.advertise<sensor_msgs::PointCloud2>(_topic_trimmed_pcl, bufSize);
     image_transport::ImageTransport it_0(n);
@@ -58,10 +58,6 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     _timer_stair_detect = n.createTimer(
         ros::Duration(_stair_detect_time), &stairDetector::callback_timer_trigger, this);
 
-    // dynamic reconfigure
-    _dyn_rec_cb = boost::bind(&stairDetector::callback_dyn_reconf, this, _1, _2);
-    _dr_srv.setCallback(_dyn_rec_cb);
-
     setParam(_param);
 }
 
@@ -75,6 +71,7 @@ void stairDetector::callback_stitched_pcl(
 void stairDetector::callback_timer_trigger(
     const ros::TimerEvent &event)
 {
+    ROS_INFO("in timing trigger callback");
     Mat img(
         int(_param.img_xy_dim / _param.img_resolution),
         int(_param.img_xy_dim / _param.img_resolution),
@@ -119,12 +116,14 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
     _param.filter_slope_hist_bin_width = config.filter_slope_hist_bin_width;
 
     setParam(_param);
+    return;
 }
 
 void stairDetector::pcl_to_bird_view_img(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
     cv::Mat &img)
 {
+    ROS_INFO("in pcl_to_bird_view_img");
     int img_midpt = int(_param.img_xy_dim / _param.img_resolution) / 2;
 
     // get current xy
@@ -136,11 +135,23 @@ void stairDetector::pcl_to_bird_view_img(
     int idx_y = 0;
     for (const pcl::PointXYZ pt : cloud->points)
     {
+        /*
+        NOTE:
+        these image coordinates may be reversed. may need to switch in order
+        to correctly extract real-world coordinates from pixel coordinates
+        */
         idx_x = int((x_0 - pt.x) / _param.img_resolution) + img_midpt;
         idx_y = int((y_0 - pt.y) / _param.img_resolution) + img_midpt;
-        // NOTE: check which order to use
-        // img.at<uchar>(idx_y, idx_x)
-        img.at<uchar>(idx_x, idx_y) = 255;
+
+        /* 
+        must check that pixel index lies with image, as robot may have moved since
+        the stitched pointcloud was constructed
+        */
+        if( ! (idx_x >= img.size().width || idx_y >= img.size().height)
+            && ! (idx_x < 0 || idx_y < 0) )
+        {
+            img.at<uchar>(idx_x, idx_y) = 255;
+        }
     }
     return;
 }
@@ -190,7 +201,11 @@ void stairDetector::setParam(const stairDetectorParams &param)
 
 void stairDetector::filter_img(cv::Mat &raw_img)
 {
-    Mat proc_img, line_img, filtered_line_img;
+    ROS_INFO("IN filter_img");
+    // Mat proc_img, line_img, filtered_line_img;
+    Mat line_img, filtered_line_img;
+
+    Mat proc_img(raw_img.size(), CV_8UC1);
 
     // edge detection
     // canny_edge_detect(img, edge_img);
@@ -199,13 +214,22 @@ void stairDetector::filter_img(cv::Mat &raw_img)
     // imshow("original", img);
     // waitKey(30);
 
-    // threshold(img, edge_img, 0, 255, THRESH_BINARY);
+    // Mat t_img;
+    // threshold(raw_img, t_img, 0, 255, THRESH_BINARY);
     // imshow("after threshold", edge_img);
     // waitKey(30);
 
+    // Mat morph_img(raw_img.size(), CV_8UC1);
+    // morph_filter(raw_img, morph_img);
+    // Mat t_img;
+    // threshold(morph_img, t_img, 0, 255, THRESH_BINARY);
+    // skeleton_filter(morph_img, proc_img);
+    // skeleton_filter(t_img, proc_img);
+    // threshold(proc_img, proc_img, 0, 255, THRESH_BINARY);
+ 
+    // ---------------------------------------- //
     morph_filter(raw_img, proc_img);
 
-    blur(proc_img, proc_img, Size(3, 3));
     // bilateralFilter(edge_img, blurred_img, 3, 500, 250);
     // medianBlur(edge_img, edge_img, 3);
     // imshow("after edge detection", edge_img);
@@ -230,14 +254,12 @@ void stairDetector::filter_img(cv::Mat &raw_img)
     }
     if (!lines.empty())
     {
-
         // plot lines on image
         cvtColor(proc_img, line_img, CV_GRAY2BGR);
         draw_lines(line_img, lines, Scalar(255, 0, 0));
 
         // line clustering
         Lines filtered_lines;
-        // filter_lines_by_slope_hist(lines, filtered_lines);
         cluster_by_kmeans(line_img, lines);
         draw_lines(filtered_line_img, filtered_lines, Scalar(0, 255, 0));
 
@@ -317,6 +339,29 @@ void stairDetector::morph_filter(const cv::Mat &img_in, cv::Mat &img_out)
         _param.morph_num_iter,
         1,
         1);
+    return;
+}
+
+void stairDetector::skeleton_filter(
+    const cv::Mat &img_in, 
+    cv::Mat &img_out)
+{
+    // http://felix.abecassis.me/2011/09/opencv-morphological-skeleton/
+    Mat element = getStructuringElement(MORPH_CROSS, Size(3,3));
+    Mat temp(img_in.size(), CV_8UC1);
+    bool done = false;
+    do 
+    {
+        morphologyEx(img_in, temp, MORPH_OPEN, element);
+        bitwise_not(temp, temp);
+        bitwise_and(img_in, temp, temp);
+        bitwise_or(img_out, temp, img_out);
+        erode(img_in, img_in, element);
+
+        double max;
+        minMaxLoc(img_in, 0, &max);
+        done = (max == 0);
+    } while (!done);
     return;
 }
 
