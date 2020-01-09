@@ -68,7 +68,14 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
 void stairDetector::callback_stitched_pcl(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg)
 {
-    _recent_cloud = msg;
+    if (!msg->empty())
+    {
+        _recent_cloud = msg;
+    }
+    else
+    {
+        ROS_INFO("Message is empty");
+    }
     return;
 }
 
@@ -81,11 +88,18 @@ void stairDetector::callback_timer_trigger(
         CV_8UC1,
         Scalar(0));
 
-    // convert most recently-received pointcloud to birds-eye-view image
-    pcl_to_bird_view_img(_recent_cloud, img);
+    if (!_recent_cloud->empty())
+    {
+        // convert most recently-received pointcloud to birds-eye-view image
+        pcl_to_bird_view_img(_recent_cloud, img);
+        // filtering on birds-eye image
+        filter_img(img);
+    }
+    else
+    {
+        ROS_INFO("No stitch in progress");
+    }
 
-    // filtering on birds-eye image
-    filter_img(img);
     return;
 }
 
@@ -125,6 +139,7 @@ void stairDetector::pcl_to_bird_view_img(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
     cv::Mat &img)
 {
+
     int img_midpt = int(_param.img_xy_dim / _param.img_resolution) / 2;
 
     // get current xy
@@ -464,6 +479,7 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines)
 
     std::vector<cv::Point2f> mid_pts;
 
+    // need to add slope parameter !
     for (i = 0; i < lines.size(); i++)
     {
         points.push_back(lines[i].p_mid);
