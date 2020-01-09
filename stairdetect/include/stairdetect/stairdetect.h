@@ -45,6 +45,10 @@ struct stairDetectorParams
   double canny_ratio = 50;
   int canny_kernel_size = 1;
 
+  // morphological filter
+  int morph_kernel_size = 3;
+  int morph_num_iter = 1;
+
   // hough transfrom
   double hough_min_line_length = 50; // pixel distance
   double hough_max_line_gap = 15;    // pixel distance
@@ -92,11 +96,11 @@ public:
       const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, cv::Mat &img);
   void filter_img(cv::Mat &img);
   void canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge);
-
+  void morph_filter(const cv::Mat &img_in, cv::Mat &img_out);
   void hough_lines(const cv::Mat &img_in, Lines &lines);
   void lsd_lines(const cv::Mat &img_in, Lines &lines);
   void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
-  void publish_img_msgs(cv::Mat &img_bird_view, cv::Mat &img_edge, cv::Mat &img_line, cv::Mat &img_line_filtered);
+  void publish_img_msgs(cv::Mat &img_bird_view, cv::Mat &img_proc, cv::Mat &img_line, cv::Mat &img_line_filtered);
 
   void cluster_by_kmeans(const cv::Mat &img, Lines &lines);
   void filter_lines_by_slope_hist(const Lines &input_lines, Lines &filtered_lines);
@@ -109,7 +113,8 @@ private:
   // publishers
   ros::Publisher _pub_trimmed_pcl;
   image_transport::Publisher _pub_bird_view_img;
-  image_transport::Publisher _pub_edge_img;
+  image_transport::Publisher _pub_proc_img;
+  image_transport::Publisher _pub_morph_img;
   image_transport::Publisher _pub_line_img;
   image_transport::Publisher _pub_filtered_line_img;
 
@@ -121,7 +126,7 @@ private:
   std::string _topic_pose;
   std::string _topic_trimmed_pcl;
   std::string _topic_bird_eye_img;
-  std::string _topic_edge_img;
+  std::string _topic_proc_img;
   std::string _topic_line_img;
   std::string _topic_filtered_line_img;
 
