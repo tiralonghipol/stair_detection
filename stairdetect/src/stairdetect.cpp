@@ -226,6 +226,14 @@ void stairDetector::filter_img(cv::Mat &raw_img)
     // skeleton_filter(morph_img, proc_img);
     // skeleton_filter(t_img, proc_img);
     // threshold(proc_img, proc_img, 0, 255, THRESH_BINARY);
+ 
+    // Mat tmp_img(raw_img.size(), CV_8UC1);
+    // morph_filter(raw_img, tmp_img);
+    // skeleton_filter(tmp_img, proc_img);
+    // medianBlur(proc_img, proc_img, 3);
+
+    // skeleton_filter(raw_img, proc_img);
+
 
     // ---------------------------------------- //
     morph_filter(raw_img, proc_img);
@@ -338,23 +346,32 @@ void stairDetector::skeleton_filter(
     cv::Mat &img_out)
 {
     // http://felix.abecassis.me/2011/09/opencv-morphological-skeleton/
-    Mat element = getStructuringElement(MORPH_CROSS, Size(3, 3));
-    Mat temp(img_in.size(), CV_8UC1);
+    Mat img;
+    img_in.copyTo(img);
+
+    cv::threshold(img, img, 0, 255, THRESH_BINARY);
+    Mat temp;
+    Mat eroded;
+
+    Mat element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
+
+
     bool done = false;
     do
     {
-        morphologyEx(img_in, temp, MORPH_OPEN, element);
-        bitwise_not(temp, temp);
-        bitwise_and(img_in, temp, temp);
+        erode(img, eroded, element);
+        dilate(eroded, temp, element);
+        subtract(img, temp, temp);
         bitwise_or(img_out, temp, img_out);
-        erode(img_in, img_in, element);
+        eroded.copyTo(img);
 
-        double max;
-        minMaxLoc(img_in, 0, &max);
-        done = (max == 0);
+        done = (countNonZero(img) == 0);
     } while (!done);
+
+    // cv::threshold(img_out, img_out, 0, 255, THRESH_BINARY);
     return;
 }
+
 
 void stairDetector::draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color)
 {
