@@ -342,35 +342,16 @@ void stairDetector::morph_filter(const cv::Mat &img_in, cv::Mat &img_out)
 {
     // erosion, dilation filters
     // https://docs.opencv.org/trunk/d4/d86/group__imgproc__filter.html#gaeb1e0c1033e3f6b891a25d0511362aeb
-    // erode(
-    //     img_in,
-    //     img_out,
-    //     // Mat(),
-    //     Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1),
-    //     Point(-1, -1),
-    //     _param.morph_num_iter,
-    //     1,
-    //     1);
-    // dilate(
-    //     img_out,
-    //     img_out,
-    //     // Mat(),
-    //     Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1),
-    //     Point(-1, -1),
-    //     _param.morph_num_iter,
-    //     1,
-    //     1);
-    dilate(
+    erode(
         img_in,
         img_out,
         // Mat(),
         Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1),
         Point(-1, -1),
-        1,
-        // _param.morph_num_iter,
+        _param.morph_num_iter,
         1,
         1);
-    erode(
+    dilate(
         img_out,
         img_out,
         // Mat(),
