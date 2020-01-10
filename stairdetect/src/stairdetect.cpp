@@ -412,29 +412,6 @@ void stairDetector::skeleton_filter(
     return;
 }
 
-void stairDetector::band_pass_filter(const cv::Mat &img_in, cv::Mat &img_out) 
-{
-    Mat img_0, img_1, img_padded;
-
-    int m = getOptimalDFTSize(img_in);
-    copyMakeBorder(
-        img_in, img_padded, 0, m - img_in.rows, 0, m - img_in.cols, BORDER_CONSTANT, Scalar::all(0));
-
-    Mat planes[] = {Mat_<float>(img_padded), Mat::zeros(padded.size(), CV_32F)};
-    Mat img_complex;
-
-    merge(planes, 2, img_complex);
-
-    dft(img_complex, img_complex);
-
-
-    img_in.copy_To(img_0);
-    img_in.copy_To(img_1);
-
-    GaussianBlur
-
-    return;
-}
 
 void stairDetector::draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color)
 {

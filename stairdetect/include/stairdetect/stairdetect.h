@@ -98,7 +98,6 @@ public:
   void canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge);
   void morph_filter(const cv::Mat &img_in, cv::Mat &img_out);
   void skeleton_filter(const cv::Mat &img_in, cv::Mat &img_out);
-  void band_pass_filter(const cv::Mat &img_in, cv::Mat &img_out);
   void hough_lines(const cv::Mat &img_in, Lines &lines);
   void lsd_lines(const cv::Mat &img_in, Lines &lines);
   void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
