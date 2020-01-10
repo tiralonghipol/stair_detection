@@ -396,17 +396,19 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<L
 {
     int i, j;
     Mat points, labels, centers;
-    const int MAX_CLUSTERS = 6;
+    const int MAX_CLUSTERS = 9;
 
     Scalar colorTab[] =
         {
+            Scalar(100, 0, 255),
+            Scalar(255, 100, 0),
             Scalar(0, 0, 255),
+            Scalar(100, 100, 0),
             Scalar(0, 255, 0),
             Scalar(255, 100, 100),
             Scalar(255, 0, 255),
             Scalar(0, 255, 255),
-            Scalar(100, 100, 255)
-            };
+            Scalar(100, 100, 255)};
 
     // Mat bg_img(320, 240, CV_8UC3, Scalar(0, 0, 0));
 
@@ -441,12 +443,6 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<L
         lines[i].cluster_id = clusterIdx;
     }
 
-    // for (i = 0; i < centers.rows; ++i)
-    // {
-    //     Point2f c = centers.at<Point2f>(i);
-    //     circle(img, c, 50, colorTab[i], 2, 8);
-    // }
-
     for (j = 0; j < MAX_CLUSTERS; j++)
     {
         tmp.clear();
@@ -469,18 +465,13 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<L
 
                 Point ipt = clustered_lines[j][i].p_mid;
                 circle(img, ipt, 10, colorTab[j], 2, 8);
-                // Point2f c = centers.at<Point2f>(i);
-                // circle(img, c, 50, colorTab[j], 2, 8);
             }
         }
         else
         {
-            ROS_INFO("Points inside cluster < 3");
+            ROS_INFO("Not enough points in cluster ");
         }
     }
-    // cout << "Compactness: " << compactness << endl;
-    // imshow("clusters", img);
-    // waitKey(30);
 
     return;
 }

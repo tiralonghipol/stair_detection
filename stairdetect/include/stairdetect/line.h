@@ -81,6 +81,7 @@ public:
   cv::Point2f p_mid;
   int pixels_num = 0;
   int cluster_id = 0;
+  double p_mid_z = 0;
   // cv::LineIterator it;
   std::vector<cv::Point> pixels;
 };
