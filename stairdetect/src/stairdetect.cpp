@@ -241,6 +241,13 @@ void stairDetector::filter_img(cv::Mat &raw_img)
     // skeleton_filter(t_img, proc_img);
     // threshold(proc_img, proc_img, 0, 255, THRESH_BINARY);
  
+    // Mat tmp_img(raw_img.size(), CV_8UC1);
+    // morph_filter(raw_img, tmp_img);
+    // skeleton_filter(tmp_img, proc_img);
+    // medianBlur(proc_img, proc_img, 3);
+
+    // skeleton_filter(raw_img, proc_img);
+
     // ---------------------------------------- //
     morph_filter(raw_img, proc_img);
 
@@ -335,16 +342,35 @@ void stairDetector::morph_filter(const cv::Mat &img_in, cv::Mat &img_out)
 {
     // erosion, dilation filters
     // https://docs.opencv.org/trunk/d4/d86/group__imgproc__filter.html#gaeb1e0c1033e3f6b891a25d0511362aeb
-    erode(
+    // erode(
+    //     img_in,
+    //     img_out,
+    //     // Mat(),
+    //     Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1),
+    //     Point(-1, -1),
+    //     _param.morph_num_iter,
+    //     1,
+    //     1);
+    // dilate(
+    //     img_out,
+    //     img_out,
+    //     // Mat(),
+    //     Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1),
+    //     Point(-1, -1),
+    //     _param.morph_num_iter,
+    //     1,
+    //     1);
+    dilate(
         img_in,
         img_out,
         // Mat(),
         Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1),
         Point(-1, -1),
-        _param.morph_num_iter,
+        1,
+        // _param.morph_num_iter,
         1,
         1);
-    dilate(
+    erode(
         img_out,
         img_out,
         // Mat(),
@@ -361,21 +387,52 @@ void stairDetector::skeleton_filter(
     cv::Mat &img_out)
 {
     // http://felix.abecassis.me/2011/09/opencv-morphological-skeleton/
-    Mat element = getStructuringElement(MORPH_CROSS, Size(3,3));
-    Mat temp(img_in.size(), CV_8UC1);
-    bool done = false;
-    do 
-    {
-        morphologyEx(img_in, temp, MORPH_OPEN, element);
-        bitwise_not(temp, temp);
-        bitwise_and(img_in, temp, temp);
-        bitwise_or(img_out, temp, img_out);
-        erode(img_in, img_in, element);
+    Mat img;
+    img_in.copyTo(img);
 
-        double max;
-        minMaxLoc(img_in, 0, &max);
-        done = (max == 0);
+    cv::threshold(img, img, 0, 255, THRESH_BINARY);
+    Mat temp;
+    Mat eroded;
+
+    Mat element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
+
+    bool done = false;
+    do
+    {
+        erode(img, eroded, element);
+        dilate(eroded, temp, element);
+        subtract(img, temp, temp);
+        bitwise_or(img_out, temp, img_out);
+        eroded.copyTo(img);
+
+        done = (countNonZero(img) == 0);
     } while (!done);
+
+    // cv::threshold(img_out, img_out, 0, 255, THRESH_BINARY);
+    return;
+}
+
+void stairDetector::band_pass_filter(const cv::Mat &img_in, cv::Mat &img_out) 
+{
+    Mat img_0, img_1, img_padded;
+
+    int m = getOptimalDFTSize(img_in);
+    copyMakeBorder(
+        img_in, img_padded, 0, m - img_in.rows, 0, m - img_in.cols, BORDER_CONSTANT, Scalar::all(0));
+
+    Mat planes[] = {Mat_<float>(img_padded), Mat::zeros(padded.size(), CV_32F)};
+    Mat img_complex;
+
+    merge(planes, 2, img_complex);
+
+    dft(img_complex, img_complex);
+
+
+    img_in.copy_To(img_0);
+    img_in.copy_To(img_1);
+
+    GaussianBlur
+
     return;
 }
 
