@@ -17,26 +17,15 @@
         <param name="canny_ratio" value="10" type="double"/>
         <param name="canny_kernel_size" value="1" type="int"/>
 
-        <param name="hough_min_line_length" value="60" type="double"/>
-        <param name="hough_max_line_gap" value="8" type="double"/>
-        <param name="hough_th" value="50" type="double"/>
-        <param name="hough_rho" value="1" type="int"/>
-        <param name="hough_theta" value="1" type="double"/>
-
-        <param name="lsd_scale" value=" 0.8" type="double"/>
-        <param name="lsd_sigma_scale" value=" 0.6" type="double"/>
+        <param name="lsd_scale" value=" 0.2" type="double"/>
+        <param name="lsd_sigma_scale" value=" 0.2" type="double"/>
         <param name="lsd_quant" value="2.0" type="double"/>
         <param name="lsd_angle_th" value="22.5" type="double"/>
         <param name="lsd_log_eps" value="0.0" type="double"/>
-        <param name="lsd_density_th" value="0.7" type="double"/>
-        <param name="filter_slope_hist_bin_width" value="10" type="double"/>
+        <param name="lsd_density_th" value="0.1" type="double"/>
 
-        <param name="morph_kernel_size" value="3" type="int"/>
+        <param name="morph_kernel_size" value="2" type="int"/>
         <param name="morph_num_iter" value="1" type="int"/>
-
-        <!-- specify which type of line detection -->
-        <!-- <param name="line_detection_method" value="hough" type="str"/> -->
-        <param name="line_detection_method" value="lsd" type="str"/>
 
         <!-- timing -->
         <param name="stair_detect_timing" value="5.0" type="double"/>

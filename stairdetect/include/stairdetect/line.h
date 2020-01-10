@@ -40,7 +40,6 @@ public:
     this->r = x1 * sin(t) + y1 * cos(t);
     this->p1 = *new cv::Point(x1, y1);
     this->p2 = *new cv::Point(x2, y2);
-    this->center = p1 - p2;
     this->p_mid.x = (p1.x + p2.x) / 2;
     this->p_mid.y = (p1.y + p2.y) / 2;
     this->length = cv::norm(this->p1 - this->p2);
@@ -65,8 +64,12 @@ public:
 
   friend std::ostream &operator<<(std::ostream &os, const Line &line)
   {
-    os << "Point1: " << line.p1 << " Point2: " << line.p2 << " k:" << line.k
-       << " b:" << line.b << " t: " << line.t << " r: " << line.r;
+    os << "P1: " << line.p1
+       << "\tP2: " << line.p2 
+       << "\tk: " << line.k
+       << "\tid: " << line.cluster_id << "\n";
+    // os << "\nPoint1: " << line.p1 << " Point2: " << line.p2 << " k:" << line.k
+    //    << " b:" << line.b << " t: " << line.t << " r: " << line.r << "\n";
     return os;
   }
 
@@ -76,8 +79,8 @@ public:
   cv::Point p1;
   cv::Point p2;
   cv::Point2f p_mid;
-  cv::Point center;
   int pixels_num = 0;
+  int cluster_id = 0;
   // cv::LineIterator it;
   std::vector<cv::Point> pixels;
 };
