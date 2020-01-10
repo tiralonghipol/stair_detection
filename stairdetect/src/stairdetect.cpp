@@ -16,7 +16,6 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     n.getParam("topic_filtered_line_img", _topic_filtered_line_img);
 
     n.getParam("stair_detect_timing", _stair_detect_time);
-    n.getParam("line_detection_method", _line_detection_method);
 
     // other params
     _pose_Q_size = 40;
@@ -113,12 +112,6 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
     _param.morph_kernel_size = config.morph_kernel_size;
     _param.morph_num_iter = config.morph_num_iter;
 
-    // hough transform
-    _param.hough_min_line_length = config.hough_min_line_length;
-    _param.hough_max_line_gap = config.hough_max_line_gap;
-    _param.hough_th = config.hough_th;
-    _param.hough_rho = config.hough_rho;
-    _param.hough_theta = config.hough_theta;
     // lsd
     _param.lsd_scale = config.lsd_scale;
     _param.lsd_sigma_scale = config.lsd_sigma_scale;
@@ -126,8 +119,6 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
     _param.lsd_angle_th = config.lsd_angle_th;
     _param.lsd_log_eps = config.lsd_log_eps;
     _param.lsd_density_th = config.lsd_density_th;
-    // filter stuff
-    _param.filter_slope_hist_bin_width = config.filter_slope_hist_bin_width;
 
     setParam(_param);
     return;
@@ -161,8 +152,7 @@ void stairDetector::pcl_to_bird_view_img(
         must check that pixel index lies with image, as robot may have moved since
         the stitched pointcloud was constructed
         */
-        if( ! (idx_x >= img.size().width || idx_y >= img.size().height)
-            && ! (idx_x < 0 || idx_y < 0) )
+        if (!(idx_x >= img.size().width || idx_y >= img.size().height) && !(idx_x < 0 || idx_y < 0))
         {
             img.at<uchar>(idx_x, idx_y) = 255;
         }
@@ -175,8 +165,6 @@ void stairDetector::trim_stitched_pcl(
 {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr;
 
-    pcl::PointXYZ minPt, maxPt;
-    // pcl::getMinMax3D
     return;
 }
 
@@ -199,8 +187,6 @@ void stairDetector::callback_pose(
 void stairDetector::setParam(const stairDetectorParams &param)
 {
     _param = param;
-    _param.hough_theta = _param.hough_theta * PI / 180;
-    _param.filter_slope_hist_bin_width = _param.filter_slope_hist_bin_width * PI / 180;
     _param.canny_kernel_size = _param.canny_kernel_size * 2 + 1;
     if (_param.canny_kernel_size > 7)
     {
@@ -248,6 +234,7 @@ void stairDetector::filter_img(cv::Mat &raw_img)
 
     // skeleton_filter(raw_img, proc_img);
 
+
     // ---------------------------------------- //
     morph_filter(raw_img, proc_img);
 
@@ -261,28 +248,19 @@ void stairDetector::filter_img(cv::Mat &raw_img)
 
     // line detection
     Lines lines;
-    if (_line_detection_method == "hough")
-    {
-        hough_lines(proc_img, lines);
-    }
-    else if (_line_detection_method == "lsd")
-    {
-        lsd_lines(proc_img, lines);
-    }
-    else
-    {
-        ROS_WARN("LINE DETECTION ALGORITHM SPECIFIED DOES NOT EXIST (must be hough or lsd)");
-    }
-    if (!lines.empty())
+    lsd_lines(proc_img, lines);
+
+    if (lines.size() > 3)
     {
         // plot lines on image
         cvtColor(proc_img, line_img, CV_GRAY2BGR);
         draw_lines(line_img, lines, Scalar(255, 0, 0));
 
         // line clustering
-        Lines filtered_lines;
-        cluster_by_kmeans(line_img, lines);
-        draw_lines(filtered_line_img, filtered_lines, Scalar(0, 255, 0));
+        vector<Lines> clustered_lines;
+
+        cluster_by_kmeans(line_img, lines, clustered_lines);
+        // draw_lines(filtered_line_img, filtered_lines, Scalar(0, 255, 0));
 
         if (_param.debug)
         {
@@ -364,7 +342,7 @@ void stairDetector::morph_filter(const cv::Mat &img_in, cv::Mat &img_out)
 }
 
 void stairDetector::skeleton_filter(
-    const cv::Mat &img_in, 
+    const cv::Mat &img_in,
     cv::Mat &img_out)
 {
     // http://felix.abecassis.me/2011/09/opencv-morphological-skeleton/
@@ -376,6 +354,7 @@ void stairDetector::skeleton_filter(
     Mat eroded;
 
     Mat element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
+
 
     bool done = false;
     do
@@ -402,36 +381,6 @@ void stairDetector::draw_lines(cv::Mat &image, const Lines &lines, const cv::Sca
     }
 }
 
-void stairDetector::hough_lines(const cv::Mat &proc_img, Lines &lines)
-{
-    lines.clear();
-    if (_param.hough_theta == 0)
-    {
-        _param.hough_theta = 1 * PI / 180;
-    }
-    if (_param.hough_rho == 0)
-    {
-        _param.hough_rho = 1;
-    }
-
-    std::vector<Vec4i> xy_lines;
-    HoughLinesP(proc_img, xy_lines,
-                (double)_param.hough_rho / 10,
-                (double)_param.hough_theta,
-                (int)_param.hough_th,
-                (double)_param.hough_min_line_length,
-                (double)_param.hough_max_line_gap);
-
-    for (int i = 0; i < xy_lines.size(); i++)
-    {
-        Line line(xy_lines[i]);
-        line.calPixels(proc_img);
-        lines.push_back(line);
-    }
-    ROS_INFO_ONCE("Found %d lines", lines.size());
-    return;
-}
-
 void stairDetector::lsd_lines(const cv::Mat &img_in, Lines &lines)
 {
     vector<Vec4i> xy_lines;
@@ -451,88 +400,30 @@ void stairDetector::lsd_lines(const cv::Mat &img_in, Lines &lines)
         Line line(xy_lines[i]);
         line.calPixels(img_in);
         lines.push_back(line);
+        // cout << lines[i];
     }
-    return;
-}
-
-void stairDetector::filter_lines_by_slope_hist(const Lines &input_lines, Lines &filtered_lines)
-{
-    // calculate histogram
-    std::vector<int> slope_hist;
-    std::vector<std::vector<int>> slope_hist_list;
-    // 10 degree
-    double bin_width = _param.filter_slope_hist_bin_width;
-    int bin_num = PI / bin_width;
-
-    // initialize the histogram
-    for (int i = 0; i < bin_num; i++)
-    {
-        slope_hist.push_back(0);
-        std::vector<int> empty;
-        slope_hist_list.push_back(empty);
-    }
-
-    // calculate slope_hist value
-    for (int i = 0; i < input_lines.size(); i++)
-    {
-        double t = input_lines[i].t;
-        if (t < 0)
-        {
-            t = t + PI;
-        }
-        if (t > PI)
-        {
-            t = t - PI;
-        }
-        // std::cout << xy_linesk << std::endl;
-        int id = t / bin_width;
-        if (id > bin_num)
-        {
-            id = 0;
-        }
-        if (id < 0)
-        {
-            id = bin_num;
-        }
-        slope_hist[id]++;
-        slope_hist_list[id].push_back(i);
-    }
-
-    // calcuate the maximum frequency angle
-    int max_id = std::distance(slope_hist.begin(), std::max_element(slope_hist.begin(), slope_hist.end()));
-    if (_param.debug)
-    {
-        ROS_INFO("Maximum frequency is between angle: %f and %f ",
-                 max_id * bin_width * 180 / PI,
-                 (max_id + 1) * bin_width * 180 / PI);
-    }
-
-    // extract the filtered lines
-    for (int i = 0; i < slope_hist_list[max_id].size(); i++)
-    {
-        int id = slope_hist_list[max_id][i];
-        filtered_lines.push_back(input_lines[id]);
-    }
-    ROS_INFO_ONCE("Input: %d | Output: %d lines",
-                  input_lines.size(),
-                  filtered_lines.size());
+    ROS_INFO_ONCE("Found %d lines", lines.size());
 
     return;
 }
 
-void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines)
+void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines)
 {
-    int i;
+    int i, j;
     Mat points, labels, centers;
+    const int MAX_CLUSTERS = 8;
 
-    const int MAX_CLUSTERS = 5;
     Scalar colorTab[] =
         {
+            Scalar(100, 0, 255),
+            // Scalar(255, 100, 0),
             Scalar(0, 0, 255),
+            Scalar(100, 100, 0),
             Scalar(0, 255, 0),
             Scalar(255, 100, 100),
             Scalar(255, 0, 255),
-            Scalar(0, 255, 255)};
+            Scalar(0, 255, 255),
+            Scalar(100, 100, 255)};
 
     // Mat bg_img(320, 240, CV_8UC3, Scalar(0, 0, 0));
 
@@ -542,37 +433,61 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines)
     for (i = 0; i < lines.size(); i++)
     {
         points.push_back(lines[i].p_mid);
-        circle(img, lines[i].p_mid, 10, Scalar(0, 255, 0), 1, 8);
     }
 
     double compactness = kmeans(points, MAX_CLUSTERS, labels,
-                                TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 100, 1.0),
+                                TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 50, 1.0),
                                 3, KMEANS_PP_CENTERS, centers);
 
     // imshow("mid points", img);
     // waitKey(30);
-    // cout << m_mid_pts << endl;
+    // cout << points << endl;
     // cout << "-----------------" << endl;
     // cout << labels << endl;
     // cout << "-----------------" << endl;
     // cout << centers << endl;
     // cout << "-----------------" << endl;
+    vector<int> ids;
+    // std::vector<Lines> clustered_lines;
+    Lines tmp;
 
     // img = Scalar::all(0);
     for (i = 0; i < lines.size(); i++)
     {
         int clusterIdx = labels.at<int>(i);
-        Point ipt = points.at<Point2f>(i);
-        circle(img, ipt, 2, colorTab[clusterIdx], FILLED, LINE_AA);
+        lines[i].cluster_id = clusterIdx;
     }
-    for (i = 0; i < centers.rows; ++i)
+
+    for (j = 0; j < MAX_CLUSTERS; j++)
     {
-        Point2f c = centers.at<Point2f>(i);
-        circle(img, c, 40, colorTab[i], 2, LINE_AA);
+        tmp.clear();
+        for (i = 0; i < lines.size(); i++)
+        {
+            if (lines[i].cluster_id == j)
+                tmp.push_back(lines[i]);
+        }
+        clustered_lines.push_back(tmp);
     }
-    // cout << "Compactness: " << compactness << endl;
-    // imshow("clusters", img);
-    // waitKey(30);
+
+    for (j = 0; j < MAX_CLUSTERS; j++)
+    {
+        // ROS_INFO("%d", clustered_lines[j].size());
+        if (clustered_lines[j].size() > 3)
+        {
+
+            for (i = 0; i < clustered_lines[j].size(); i++)
+            {
+
+                Point ipt = clustered_lines[j][i].p_mid;
+                circle(img, ipt, 10, colorTab[j], 2, 8);
+            }
+        }
+        else
+        {
+            ROS_INFO("Not enough points in cluster ");
+        }
+    }
 
     return;
 }
+

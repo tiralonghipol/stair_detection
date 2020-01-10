@@ -49,30 +49,20 @@ struct stairDetectorParams
   int morph_kernel_size = 3;
   int morph_num_iter = 1;
 
-  // hough transfrom
-  double hough_min_line_length = 50; // pixel distance
-  double hough_max_line_gap = 15;    // pixel distance
-  double hough_th = 20;
-  int hough_rho = 8;
-  double hough_theta = 1; // angle
-
   // line segment detection
   // https://codeutils.xyz/OpenCV3.3.0/dd/d1a/group__imgproc__feature.html#ga6b2ad2353c337c42551b521a73eeae7d
-  double lsd_scale = 0.8;
-  double lsd_sigma_scale = 0.6;
+  double lsd_scale = 0.25;
+  double lsd_sigma_scale = 0.25;
   double lsd_quant = 2.0;
   double lsd_angle_th = 22.5;
   double lsd_log_eps = 0.0;
-  double lsd_density_th = 0.7;
+  double lsd_density_th = 0.1;
   int lsd_n_bins = 1024;
 
   // pcl to img params
   // THESE SHOULD PROBABLY COME FROM LIDAR_STITCH_PARAMS
   double img_xy_dim = 25;
   double img_resolution = 0.02;
-
-  // filter
-  double filter_slope_hist_bin_width = 20;
 };
 
 class stairDetector
@@ -98,13 +88,11 @@ public:
   void canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge);
   void morph_filter(const cv::Mat &img_in, cv::Mat &img_out);
   void skeleton_filter(const cv::Mat &img_in, cv::Mat &img_out);
-  void hough_lines(const cv::Mat &img_in, Lines &lines);
   void lsd_lines(const cv::Mat &img_in, Lines &lines);
   void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
   void publish_img_msgs(cv::Mat &img_bird_view, cv::Mat &img_proc, cv::Mat &img_line, cv::Mat &img_line_filtered);
 
-  void cluster_by_kmeans(const cv::Mat &img, Lines &lines);
-  void filter_lines_by_slope_hist(const Lines &input_lines, Lines &filtered_lines);
+  void cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines);
 
 private:
   // subscribers
@@ -130,9 +118,6 @@ private:
   std::string _topic_proc_img;
   std::string _topic_line_img;
   std::string _topic_filtered_line_img;
-
-  // specification of line-detection method
-  std::string _line_detection_method;
 
   // pointcloud trimming params
   double _stair_detect_time;
