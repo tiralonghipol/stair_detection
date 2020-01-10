@@ -51,8 +51,8 @@ struct stairDetectorParams
 
   // line segment detection
   // https://codeutils.xyz/OpenCV3.3.0/dd/d1a/group__imgproc__feature.html#ga6b2ad2353c337c42551b521a73eeae7d
-  double lsd_scale = 0.8;
-  double lsd_sigma_scale = 0.6;
+  double lsd_scale = 0.25;
+  double lsd_sigma_scale = 0.25;
   double lsd_quant = 2.0;
   double lsd_angle_th = 22.5;
   double lsd_log_eps = 0.0;
@@ -92,7 +92,7 @@ public:
   void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
   void publish_img_msgs(cv::Mat &img_bird_view, cv::Mat &img_proc, cv::Mat &img_line, cv::Mat &img_line_filtered);
 
-  void cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<Lines> clustered_lines);
+  void cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines);
 
 private:
   // subscribers

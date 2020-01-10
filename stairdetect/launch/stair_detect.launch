@@ -17,8 +17,8 @@
         <param name="canny_ratio" value="10" type="double"/>
         <param name="canny_kernel_size" value="1" type="int"/>
 
-        <param name="lsd_scale" value=" 0.2" type="double"/>
-        <param name="lsd_sigma_scale" value=" 0.2" type="double"/>
+        <param name="lsd_scale" value=" 0.25" type="double"/>
+        <param name="lsd_sigma_scale" value=" 0.25" type="double"/>
         <param name="lsd_quant" value="2.0" type="double"/>
         <param name="lsd_angle_th" value="22.5" type="double"/>
         <param name="lsd_log_eps" value="0.0" type="double"/>

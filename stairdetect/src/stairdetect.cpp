@@ -165,8 +165,6 @@ void stairDetector::trim_stitched_pcl(
 {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr;
 
-    pcl::PointXYZ minPt, maxPt;
-    // pcl::getMinMax3D
     return;
 }
 
@@ -392,16 +390,16 @@ void stairDetector::lsd_lines(const cv::Mat &img_in, Lines &lines)
     return;
 }
 
-void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<Lines> clustered_lines)
+void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines)
 {
     int i, j;
     Mat points, labels, centers;
-    const int MAX_CLUSTERS = 9;
+    const int MAX_CLUSTERS = 8;
 
     Scalar colorTab[] =
         {
             Scalar(100, 0, 255),
-            Scalar(255, 100, 0),
+            // Scalar(255, 100, 0),
             Scalar(0, 0, 255),
             Scalar(100, 100, 0),
             Scalar(0, 255, 0),
@@ -475,3 +473,4 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<L
 
     return;
 }
+
