@@ -77,7 +77,7 @@ void stairDetector::callback_stitched_pcl(
 void stairDetector::callback_timer_trigger(
     const ros::TimerEvent &event)
 {
-    ROS_INFO("in timing trigger callback");
+    ROS_INFO("In timing trigger callback");
     Mat img(
         int(_param.img_xy_dim / _param.img_resolution),
         int(_param.img_xy_dim / _param.img_resolution),
@@ -252,6 +252,7 @@ void stairDetector::filter_img(cv::Mat &raw_img)
         vector<Lines> clustered_lines;
 
         cluster_by_kmeans(line_img, lines, clustered_lines);
+        // cluster_by_knn(line_img, lines, clustered_lines);
         // draw_lines(filtered_line_img, filtered_lines, Scalar(0, 255, 0));
 
         if (_param.debug)
@@ -393,7 +394,8 @@ void stairDetector::lsd_lines(const cv::Mat &img_in, Lines &lines)
 void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines)
 {
     int i, j;
-    Mat points, labels, centers;
+    // Mat points, labels, centers;
+    Mat labels, centers;
     const int MAX_CLUSTERS = 8;
 
     Scalar colorTab[] =
@@ -410,14 +412,24 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<L
 
     // Mat bg_img(320, 240, CV_8UC3, Scalar(0, 0, 0));
 
-    std::vector<cv::Point2f> mid_pts;
+    vector<Point2f> mid_pts;
 
-    // need to add slope parameter !
+    vector<double> x_y_k;
+    vector<vector<double>> points;
+
     for (i = 0; i < lines.size(); i++)
     {
-        points.push_back(lines[i].p_mid);
+        x_y_k.clear();
+        x_y_k.push_back(lines[i].p_mid.x);
+        x_y_k.push_back(lines[i].p_mid.y);
+        x_y_k.push_back(lines[i].k);
+
+        points.push_back(x_y_k);
+        cout << points[i][0] << " " << points[i][1] << " " << points[i][2] << endl;
     }
 
+    // cout << points[0][0] << endl;
+    
     double compactness = kmeans(points, MAX_CLUSTERS, labels,
                                 TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 50, 1.0),
                                 3, KMEANS_PP_CENTERS, centers);
@@ -430,8 +442,6 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<L
     // cout << "-----------------" << endl;
     // cout << centers << endl;
     // cout << "-----------------" << endl;
-    vector<int> ids;
-    // std::vector<Lines> clustered_lines;
     Lines tmp;
 
     // img = Scalar::all(0);
@@ -474,3 +484,10 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<L
     return;
 }
 
+void stairDetector::cluster_by_knn(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines)
+// void stairDetector::cluster_by_knn()
+{
+    ROS_WARN("Inside KNN");
+
+    return;
+}
