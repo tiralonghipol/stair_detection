@@ -96,12 +96,14 @@ public:
 
   // line processing
   void cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines);
-  void process_clustered_lines(const vector<Lines> & clustered_lines, vector<Lines> & processed_lines);
-  Lines filter_lines_by_angle(const Lines & lines_in);
-  Eigen::Matrix2d calc_covariance_matrix(const Lines & lines);
+  void process_clustered_lines(const vector<Lines> &clustered_lines, vector<Lines> &processed_lines);
+  Lines filter_lines_by_angle(const Lines &lines_in);
+  Lines filter_lines_by_mid_pts_dist(const Lines &lines_in);
+  Eigen::Matrix2d calc_covariance_matrix(const Lines &lines);
 
-  void cluster_by_knn(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines);
-  // void cluster_by_knn();
+
+
+  Scalar random_color(RNG &rng);
 
 private:
   // subscribers
@@ -147,6 +149,9 @@ private:
 
   //
   int _max_clusters;
+
+  // color generation
+  vector<Scalar> _colorTab;
 };
 
 #endif
