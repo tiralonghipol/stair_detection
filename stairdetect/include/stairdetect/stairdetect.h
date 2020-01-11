@@ -92,7 +92,12 @@ public:
   void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
   void publish_img_msgs(cv::Mat &img_bird_view, cv::Mat &img_proc, cv::Mat &img_line, cv::Mat &img_line_filtered);
 
+  // line processing
   void cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines);
+  void process_clustered_lines(const vector<Lines> & clustered_lines, vector<Lines> & processed_lines);
+  Lines filter_lines_by_angle(const Lines & lines_in);
+  Eigen::Matrix2d calc_covariance_matrix(const Lines & lines);
+
 
 private:
   // subscribers
@@ -135,6 +140,9 @@ private:
   // pose queue
   int _pose_Q_size;
   std::deque<geometry_msgs::PoseWithCovarianceStamped> _pose_Q;
+
+  //
+  int _max_clusters;
 };
 
 #endif

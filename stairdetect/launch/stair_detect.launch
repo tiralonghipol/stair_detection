@@ -30,6 +30,9 @@
         <!-- timing -->
         <param name="stair_detect_timing" value="5.0" type="double"/>
 
+        <!-- line filtering -->
+        <param name="num_line_clusters" value="8" type="int"/>
+
     </node>
 
     <!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find stairdetect)/rviz/stair_detect_test.rviz" /> -->
