@@ -62,6 +62,44 @@ public:
     }
   }
 
+  friend Vec2d get_tangent_unit_vector(const Line & line)
+  {
+    // returns a unit tangent vector to the line
+    Vec2d tangent;
+    // double dx = this->p2.x - this->p1.x;
+    // double dy = this->p2.y - this->p1.y;
+    double dx = line.p2.x - line.p1.x;
+    double dy = line.p2.y - line.p1.y;
+    double mag = sqrt(dx * dx + dy * dy);
+    tangent[0] = dx / mag;
+    tangent[1] = dy / mag;
+    return tangent;
+  }
+
+  friend Vec2d get_normal_unit_vector(const Line & line)
+  {
+    // returns a unit normal vector to the line
+    Vec2d normal;
+    double dx = line.p2.x - line.p1.x;
+    double dy = line.p2.y - line.p1.y;
+    double mag = sqrt(dx * dx + dy * dy);
+    normal[0] = -dy / mag;
+    normal[1] = dx / mag;
+    return normal;
+  }
+
+  friend Vec2d get_dist_unit_vector(const Line & l_1, const Line & l_2)
+  {
+    // returns unit vector in direction of vector connecting line mindpoints
+    Vec2d dist_vec;
+    double dx = l_1.p_mid.x - l_2.p_mid.x;
+    double dy = l_1.p_mid.y - l_2.p_mid.y;
+    double mag = sqrt(dx * dx + dy * dy);
+    dist_vec[0] = dx / mag;
+    dist_vec[1] = dy / mag;
+    return dist_vec;
+  }
+
   friend std::ostream &operator<<(std::ostream &os, const Line &line)
   {
     os << "P1: " << line.p1

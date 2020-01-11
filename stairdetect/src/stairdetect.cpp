@@ -14,8 +14,8 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     n.getParam("topic_proc_img", _topic_proc_img);
     n.getParam("topic_line_img", _topic_line_img);
     n.getParam("topic_filtered_line_img", _topic_filtered_line_img);
-
     n.getParam("stair_detect_timing", _stair_detect_time);
+    n.getParam("num_line_clusters", _max_clusters);
 
     // other params
     _pose_Q_size = 40;
@@ -209,15 +209,6 @@ void stairDetector::filter_img(cv::Mat &raw_img)
 
     // edge detection
     // canny_edge_detect(img, edge_img);
-    // img = imread("/home/pol/stair_ws/src/stairdetect/imgs_test/top_view_matlab.pgm", CV_LOAD_IMAGE_GRAYSCALE);
-    // instead of using canny, use just a binary image
-    // imshow("original", img);
-    // waitKey(30);
-
-    // Mat t_img;
-    // threshold(raw_img, t_img, 0, 255, THRESH_BINARY);
-    // imshow("after threshold", edge_img);
-    // waitKey(30);
 
     // Mat morph_img(raw_img.size(), CV_8UC1);
     // morph_filter(raw_img, morph_img);
@@ -232,11 +223,7 @@ void stairDetector::filter_img(cv::Mat &raw_img)
 
     // bilateralFilter(edge_img, blurred_img, 3, 500, 250);
     // medianBlur(edge_img, edge_img, 3);
-    // imshow("after edge detection", edge_img);
-    // waitKey(30);
     // cvtColor(edge_img, edge_img, CV_BINA);
-    // imshow("after skel", edge_img);
-    // waitKey(30);
 
     // line detection
     Lines lines;
@@ -246,7 +233,7 @@ void stairDetector::filter_img(cv::Mat &raw_img)
     {
         // plot lines on image
         cvtColor(proc_img, line_img, CV_GRAY2BGR);
-        draw_lines(line_img, lines, Scalar(255, 0, 0));
+        // draw_lines(line_img, lines, Scalar(255, 0, 0));
 
         // line clustering
         vector<Lines> clustered_lines;
@@ -254,6 +241,9 @@ void stairDetector::filter_img(cv::Mat &raw_img)
         cluster_by_kmeans(line_img, lines, clustered_lines);
         // cluster_by_knn(line_img, lines, clustered_lines);
         // draw_lines(filtered_line_img, filtered_lines, Scalar(0, 255, 0));
+
+        // vector<Lines> processed_lines;
+        // process_clustered_lines(clustered_lines, processed_lines);
 
         if (_param.debug)
         {
@@ -266,6 +256,106 @@ void stairDetector::filter_img(cv::Mat &raw_img)
     }
 
     return;
+}
+
+void stairDetector::process_clustered_lines(
+    const vector<Lines> &clustered_lines,
+    vector<Lines> &processed_lines)
+{
+    processed_lines.clear();
+    for (int i = 0; i < clustered_lines.size(); i++)
+    {
+        std::cout << "\nCLUSTER:\t" << i << std::endl;
+        // remove lines in cluster which do not meet geometric constraints
+        Lines filt_lines = filter_lines_by_angle(clustered_lines[i]);
+        processed_lines.push_back(filt_lines);
+    }
+
+    // get covariance matrix for each filtered cluster
+    vector<Eigen::Matrix2d> cov_mats;
+    for (int i = 0; i < processed_lines.size(); i++)
+    {
+        if (processed_lines[i].size() > 3)
+        {
+            Eigen::Matrix2d sigma = calc_covariance_matrix(processed_lines[i]);
+            cov_mats.push_back(sigma);
+            std::cout << "\ncovariance for cluster: " << i << std::endl;
+            std::cout << sigma(0, 0) << ",\t" << sigma(0, 1) << std::endl;
+            std::cout << sigma(1, 0) << ",\t" << sigma(1, 1) << std::endl;
+
+            // eigenvalues of covariance matrix
+            Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(sigma);
+            Eigen::Vector2d e_vals = eigensolver.eigenvalues();
+            std::cout << "eigenvalues for cluster: " << i << std::endl;
+            std::cout << e_vals << std::endl;
+        }
+    }
+
+    return;
+}
+
+Lines stairDetector::filter_lines_by_angle(
+    const Lines &lines)
+{
+    // filtered lines have outliers (lines perpendicular to majority removed)
+    Lines filt_lines;
+
+    // element i, j is dot product between normals of lines i, j
+    Eigen::MatrixXf normal_dot_prods(lines.size(), lines.size());
+    for (int i = 0; i < lines.size(); i++)
+    {
+        normal_dot_prods(i, i) = 1.0;
+        for (int j = i + 1; j < lines.size(); j++)
+        {
+            double dot_prod = 0;
+            Vec2d n_i = get_normal_unit_vector(lines[i]);
+            Vec2d n_j = get_normal_unit_vector(lines[j]);
+            dot_prod = n_i[0] * n_j[0] + n_i[1] * n_j[1];
+            normal_dot_prods(i, j) = abs(dot_prod);
+            normal_dot_prods(j, i) = 0.0;
+            // std::cout << "normal dot prod: \t" << dot_prod << std::endl;
+        }
+    }
+
+    // element i, j is dot product between normal of i
+    // and distance vector between i and j
+    Eigen::MatrixXf normal_dist_dot_prods(lines.size(), lines.size());
+    for (int i = 0; i < lines.size(); i++)
+    {
+        normal_dist_dot_prods(i, i) = 1.0;
+        for (int j = i + 1; j < lines.size(); j++)
+        {
+            double dot_prod = 0;
+            Vec2d n_i = get_normal_unit_vector(lines[j]);
+            Vec2d d_ij = get_dist_unit_vector(lines[i], lines[j]);
+            dot_prod = n_i[0] * d_ij[0] + n_i[1] * d_ij[1];
+            normal_dist_dot_prods(i, j) = abs(dot_prod);
+            normal_dist_dot_prods(j, i) = 0.0;
+            // std::cout << "dot prod: \t" << dot_prod << std::endl;
+        }
+    }
+
+    for (int i = 0; i < lines.size(); i++)
+    {
+        double norm_prod_sum = 0;
+        double dist_prod_sum = 0;
+        for (int j = 0; j < lines.size(); j++)
+        {
+            norm_prod_sum += normal_dot_prods(i, j);
+            dist_prod_sum += normal_dist_dot_prods(i, j);
+        }
+
+        // don't add outliers w.r.t. normal dot prods, dist dot prods
+        if ((norm_prod_sum - 1.0) / double(lines.size() - 1.0) > 0.3 && (dist_prod_sum - 1.0) / double(lines.size() - 1.0) > 0.0)
+        {
+            filt_lines.push_back(lines[i]);
+        }
+    }
+
+    std::cout << "initial number of lines:\t" << lines.size() << std::endl;
+    std::cout << "number of lines after filter:\t" << filt_lines.size() << std::endl;
+
+    return filt_lines;
 }
 
 void stairDetector::publish_img_msgs(
@@ -313,19 +403,17 @@ void stairDetector::morph_filter(const cv::Mat &img_in, cv::Mat &img_out)
 {
     // erosion, dilation filters
     // https://docs.opencv.org/trunk/d4/d86/group__imgproc__filter.html#gaeb1e0c1033e3f6b891a25d0511362aeb
-    erode(
-        img_in,
-        img_out,
-        // Mat(),
-        Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1),
-        Point(-1, -1),
-        _param.morph_num_iter,
-        1,
-        1);
     dilate(
         img_out,
         img_out,
-        // Mat(),
+        Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1),
+        Point(-1, -1),
+        1,
+        1,
+        1);
+    erode(
+        img_in,
+        img_out,
         Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1),
         Point(-1, -1),
         _param.morph_num_iter,
@@ -339,21 +427,27 @@ void stairDetector::skeleton_filter(
     cv::Mat &img_out)
 {
     // http://felix.abecassis.me/2011/09/opencv-morphological-skeleton/
-    Mat element = getStructuringElement(MORPH_CROSS, Size(3, 3));
-    Mat temp(img_in.size(), CV_8UC1);
+    Mat img;
+    img_in.copyTo(img);
+
+    cv::threshold(img, img, 0, 255, THRESH_BINARY);
+    Mat temp;
+    Mat eroded;
+
+    Mat element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
+
     bool done = false;
     do
     {
-        morphologyEx(img_in, temp, MORPH_OPEN, element);
-        bitwise_not(temp, temp);
-        bitwise_and(img_in, temp, temp);
+        erode(img, eroded, element);
+        dilate(eroded, temp, element);
+        subtract(img, temp, temp);
         bitwise_or(img_out, temp, img_out);
-        erode(img_in, img_in, element);
+        eroded.copyTo(img);
 
-        double max;
-        minMaxLoc(img_in, 0, &max);
-        done = (max == 0);
+        done = (countNonZero(img) == 0);
     } while (!done);
+
     return;
 }
 
@@ -391,12 +485,12 @@ void stairDetector::lsd_lines(const cv::Mat &img_in, Lines &lines)
     return;
 }
 
-void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines)
+void stairDetector::cluster_by_kmeans(
+    const cv::Mat &img, Lines &lines,
+    vector<Lines> &clustered_lines)
 {
     int i, j;
-    // Mat points, labels, centers;
-    Mat labels, centers;
-    const int MAX_CLUSTERS = 8;
+    Mat points, labels, centers;
 
     Scalar colorTab[] =
         {
@@ -409,10 +503,6 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<L
             Scalar(255, 0, 255),
             Scalar(0, 255, 255),
             Scalar(100, 100, 255)};
-
-    // Mat bg_img(320, 240, CV_8UC3, Scalar(0, 0, 0));
-
-    vector<Point2f> mid_pts;
 
     vector<double> x_y_k;
     vector<vector<double>> points;
@@ -428,30 +518,18 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<L
         cout << points[i][0] << " " << points[i][1] << " " << points[i][2] << endl;
     }
 
-    // cout << points[0][0] << endl;
-    
-    double compactness = kmeans(points, MAX_CLUSTERS, labels,
+    double compactness = kmeans(points, _max_clusters, labels,
                                 TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 50, 1.0),
                                 3, KMEANS_PP_CENTERS, centers);
-
-    // imshow("mid points", img);
-    // waitKey(30);
-    // cout << points << endl;
-    // cout << "-----------------" << endl;
-    // cout << labels << endl;
-    // cout << "-----------------" << endl;
-    // cout << centers << endl;
-    // cout << "-----------------" << endl;
     Lines tmp;
 
-    // img = Scalar::all(0);
     for (i = 0; i < lines.size(); i++)
     {
         int clusterIdx = labels.at<int>(i);
         lines[i].cluster_id = clusterIdx;
     }
 
-    for (j = 0; j < MAX_CLUSTERS; j++)
+    for (j = 0; j < _max_clusters; j++)
     {
         tmp.clear();
         for (i = 0; i < lines.size(); i++)
@@ -462,16 +540,20 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<L
         clustered_lines.push_back(tmp);
     }
 
-    for (j = 0; j < MAX_CLUSTERS; j++)
+    vector<Lines> processed_lines;
+    process_clustered_lines(clustered_lines, processed_lines);
+
+    for (j = 0; j < _max_clusters; j++)
     {
         // ROS_INFO("%d", clustered_lines[j].size());
-        if (clustered_lines[j].size() > 3)
+        // if (clustered_lines[j].size() > 3)
+        if (processed_lines[j].size() > 3)
         {
-
-            for (i = 0; i < clustered_lines[j].size(); i++)
+            // for (i = 0; i < clustered_lines[j].size(); i++)
+            for (i = 0; i < processed_lines[j].size(); i++)
             {
-
-                Point ipt = clustered_lines[j][i].p_mid;
+                // Point ipt = clustered_lines[j][i].p_mid;
+                Point ipt = processed_lines[j][i].p_mid;
                 circle(img, ipt, 10, colorTab[j], 2, 8);
             }
         }
@@ -484,6 +566,33 @@ void stairDetector::cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<L
     return;
 }
 
+Eigen::Matrix2d stairDetector::calc_covariance_matrix(const Lines &lines)
+{
+    Eigen::Matrix2d cov_mat;
+    double x_bar;
+    double y_bar;
+
+    // calculate x, y, means
+    for (int i = 0; i < lines.size(); i++)
+    {
+        x_bar += lines[i].p_mid.x;
+        y_bar += lines[i].p_mid.y;
+    }
+    x_bar /= float(lines.size());
+    y_bar /= float(lines.size());
+
+    // build data matrix
+    Eigen::MatrixXd data_mat(lines.size(), 2);
+    for (int i = 0; i < lines.size(); i++)
+    {
+        data_mat(i, 0) = lines[i].p_mid.x - x_bar;
+        data_mat(i, 1) = lines[i].p_mid.y - y_bar;
+    }
+
+    cov_mat = data_mat.transpose() * data_mat;
+    cov_mat /= float(lines.size());
+    return cov_mat;
+}
 void stairDetector::cluster_by_knn(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines)
 // void stairDetector::cluster_by_knn()
 {
