@@ -312,11 +312,12 @@ void stairDetector::process_clustered_lines(
 Lines stairDetector::filter_lines_by_mid_pts_dist(
     const Lines &lines)
 {
-    Mat distances(lines.size(), lines.size(), CV_32F);
+    Mat distances(lines.size(), lines.size(), CV_32F), row;
     Lines filt_lines;
     double dx, dy, mag;
+    vector<double> min_dists;
 
-    if (lines.size() > 0)
+    if (lines.size() > 3)
     {
         for (int i = 0; i < lines.size(); i++)
         {
@@ -335,17 +336,49 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
                 }
             }
         }
+        // diagonal is all zeros
+        for (int i = 0; i < distances.rows - 1; i++)
+        {
+            // initialize the minimum element as big
+            int minm = 999;
+
+            for (int j = i + 1; j < distances.cols; j++)
+            {
+                //  check for minimum  in each row of the matrix
+                if (distances.at<float>(i, j) < minm && distances.at<float>(i, j) > 0)
+                    minm = distances.at<float>(i, j);
+            }
+            if (minm > 0)
+            {
+                min_dists.push_back(minm);
+            }
+            else
+            {
+                min_dists.push_back(0);
+            }
+        }
+
         for (int i = 0; i < lines.size(); i++)
         {
+            std::cout << "min dist = " << min_dists[i] << "\t";
             for (int j = 0; j < lines.size(); j++)
             {
                 std::cout << distances.at<float>(i, j) << " ";
             }
             std::cout << "\n";
         }
+        std::cout << "---------------------"
+                  << "\n";
     }
-    std::cout << "---------------------"
-              << "\n";
+    
+
+    accumulator_set<double, stats<tag::variance>> acc;
+    for_each(min_dists.begin(), min_dists.end(), bind<void>(ref(acc), _1));
+
+    cout << boost::mean(acc) << endl;
+    cout << sqrt(boost::variance(acc)) << endl;
+
+    min_dists.clear();
     filt_lines = lines;
     return filt_lines;
 }

@@ -21,10 +21,16 @@
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
 
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/accumulators/statistics/mean.hpp>
+#include <boost/accumulators/statistics/moment.hpp>
+
 #define PI 3.141592654
 
 using namespace std;
 using namespace cv;
+using namespace boost::accumulators;
 
 class Line
 {
