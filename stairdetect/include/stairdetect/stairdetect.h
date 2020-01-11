@@ -27,6 +27,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/ml.hpp>
 
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
@@ -36,6 +37,7 @@
 
 using namespace std;
 using namespace cv;
+using namespace cv::ml;
 
 struct stairDetectorParams
 {
@@ -98,6 +100,8 @@ public:
   Lines filter_lines_by_angle(const Lines & lines_in);
   Eigen::Matrix2d calc_covariance_matrix(const Lines & lines);
 
+  void cluster_by_knn(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines);
+  // void cluster_by_knn();
 
 private:
   // subscribers

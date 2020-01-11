@@ -77,7 +77,7 @@ void stairDetector::callback_stitched_pcl(
 void stairDetector::callback_timer_trigger(
     const ros::TimerEvent &event)
 {
-    ROS_INFO("in timing trigger callback");
+    ROS_INFO("In timing trigger callback");
     Mat img(
         int(_param.img_xy_dim / _param.img_resolution),
         int(_param.img_xy_dim / _param.img_resolution),
@@ -239,6 +239,7 @@ void stairDetector::filter_img(cv::Mat &raw_img)
         vector<Lines> clustered_lines;
 
         cluster_by_kmeans(line_img, lines, clustered_lines);
+        // cluster_by_knn(line_img, lines, clustered_lines);
         // draw_lines(filtered_line_img, filtered_lines, Scalar(0, 255, 0));
 
         // vector<Lines> processed_lines;
@@ -258,11 +259,11 @@ void stairDetector::filter_img(cv::Mat &raw_img)
 }
 
 void stairDetector::process_clustered_lines(
-    const vector<Lines> & clustered_lines, 
-    vector<Lines> & processed_lines) 
+    const vector<Lines> &clustered_lines,
+    vector<Lines> &processed_lines)
 {
     processed_lines.clear();
-    for( int i = 0; i < clustered_lines.size(); i++ )
+    for (int i = 0; i < clustered_lines.size(); i++)
     {
         std::cout << "\nCLUSTER:\t" << i << std::endl;
         // remove lines in cluster which do not meet geometric constraints
@@ -272,16 +273,16 @@ void stairDetector::process_clustered_lines(
 
     // get covariance matrix for each filtered cluster
     vector<Eigen::Matrix2d> cov_mats;
-    for( int i = 0; i < processed_lines.size(); i++ )
+    for (int i = 0; i < processed_lines.size(); i++)
     {
-        if( processed_lines[i].size() > 3)
+        if (processed_lines[i].size() > 3)
         {
             Eigen::Matrix2d sigma = calc_covariance_matrix(processed_lines[i]);
             cov_mats.push_back(sigma);
             std::cout << "\ncovariance for cluster: " << i << std::endl;
-            std::cout << sigma(0,0) << ",\t" << sigma(0,1) << std::endl;
-            std::cout << sigma(1,0) << ",\t" << sigma(1,1) << std::endl;
-            
+            std::cout << sigma(0, 0) << ",\t" << sigma(0, 1) << std::endl;
+            std::cout << sigma(1, 0) << ",\t" << sigma(1, 1) << std::endl;
+
             // eigenvalues of covariance matrix
             Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(sigma);
             Eigen::Vector2d e_vals = eigensolver.eigenvalues();
@@ -294,17 +295,17 @@ void stairDetector::process_clustered_lines(
 }
 
 Lines stairDetector::filter_lines_by_angle(
-    const Lines & lines)
+    const Lines &lines)
 {
     // filtered lines have outliers (lines perpendicular to majority removed)
     Lines filt_lines;
 
     // element i, j is dot product between normals of lines i, j
     Eigen::MatrixXf normal_dot_prods(lines.size(), lines.size());
-    for( int i = 0; i < lines.size(); i++ )
+    for (int i = 0; i < lines.size(); i++)
     {
         normal_dot_prods(i, i) = 1.0;
-        for( int j = i+1; j < lines.size(); j++ )
+        for (int j = i + 1; j < lines.size(); j++)
         {
             double dot_prod = 0;
             Vec2d n_i = get_normal_unit_vector(lines[i]);
@@ -316,13 +317,13 @@ Lines stairDetector::filter_lines_by_angle(
         }
     }
 
-    // element i, j is dot product between normal of i 
+    // element i, j is dot product between normal of i
     // and distance vector between i and j
     Eigen::MatrixXf normal_dist_dot_prods(lines.size(), lines.size());
-    for( int i = 0; i < lines.size(); i++ )
+    for (int i = 0; i < lines.size(); i++)
     {
         normal_dist_dot_prods(i, i) = 1.0;
-        for( int j = i+1; j < lines.size(); j++ )
+        for (int j = i + 1; j < lines.size(); j++)
         {
             double dot_prod = 0;
             Vec2d n_i = get_normal_unit_vector(lines[j]);
@@ -334,19 +335,18 @@ Lines stairDetector::filter_lines_by_angle(
         }
     }
 
-    for( int i = 0; i < lines.size(); i++ )
+    for (int i = 0; i < lines.size(); i++)
     {
         double norm_prod_sum = 0;
         double dist_prod_sum = 0;
-        for( int j = 0; j < lines.size(); j++ )
+        for (int j = 0; j < lines.size(); j++)
         {
             norm_prod_sum += normal_dot_prods(i, j);
             dist_prod_sum += normal_dist_dot_prods(i, j);
         }
-        
+
         // don't add outliers w.r.t. normal dot prods, dist dot prods
-        if( (norm_prod_sum - 1.0) / double(lines.size() - 1.0) > 0.3
-            && (dist_prod_sum - 1.0) / double(lines.size() - 1.0) > 0.0 )
+        if ((norm_prod_sum - 1.0) / double(lines.size() - 1.0) > 0.3 && (dist_prod_sum - 1.0) / double(lines.size() - 1.0) > 0.0)
         {
             filt_lines.push_back(lines[i]);
         }
@@ -486,7 +486,7 @@ void stairDetector::lsd_lines(const cv::Mat &img_in, Lines &lines)
 }
 
 void stairDetector::cluster_by_kmeans(
-    const cv::Mat &img, Lines &lines, 
+    const cv::Mat &img, Lines &lines,
     vector<Lines> &clustered_lines)
 {
     int i, j;
@@ -504,18 +504,23 @@ void stairDetector::cluster_by_kmeans(
             Scalar(0, 255, 255),
             Scalar(100, 100, 255)};
 
-    std::vector<cv::Point2f> mid_pts;
+    vector<double> x_y_k;
+    vector<vector<double>> points;
 
-    // need to add slope parameter !
     for (i = 0; i < lines.size(); i++)
     {
-        points.push_back(lines[i].p_mid);
+        x_y_k.clear();
+        x_y_k.push_back(lines[i].p_mid.x);
+        x_y_k.push_back(lines[i].p_mid.y);
+        x_y_k.push_back(lines[i].k);
+
+        points.push_back(x_y_k);
+        cout << points[i][0] << " " << points[i][1] << " " << points[i][2] << endl;
     }
 
     double compactness = kmeans(points, _max_clusters, labels,
                                 TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 50, 1.0),
                                 3, KMEANS_PP_CENTERS, centers);
-    vector<int> ids;
     Lines tmp;
 
     for (i = 0; i < lines.size(); i++)
@@ -561,14 +566,14 @@ void stairDetector::cluster_by_kmeans(
     return;
 }
 
-Eigen::Matrix2d stairDetector::calc_covariance_matrix(const Lines & lines) 
+Eigen::Matrix2d stairDetector::calc_covariance_matrix(const Lines &lines)
 {
     Eigen::Matrix2d cov_mat;
     double x_bar;
     double y_bar;
 
     // calculate x, y, means
-    for( int i = 0; i < lines.size(); i++ )
+    for (int i = 0; i < lines.size(); i++)
     {
         x_bar += lines[i].p_mid.x;
         y_bar += lines[i].p_mid.y;
@@ -578,7 +583,7 @@ Eigen::Matrix2d stairDetector::calc_covariance_matrix(const Lines & lines)
 
     // build data matrix
     Eigen::MatrixXd data_mat(lines.size(), 2);
-    for( int i = 0; i < lines.size(); i++ )
+    for (int i = 0; i < lines.size(); i++)
     {
         data_mat(i, 0) = lines[i].p_mid.x - x_bar;
         data_mat(i, 1) = lines[i].p_mid.y - y_bar;
@@ -587,4 +592,11 @@ Eigen::Matrix2d stairDetector::calc_covariance_matrix(const Lines & lines)
     cov_mat = data_mat.transpose() * data_mat;
     cov_mat /= float(lines.size());
     return cov_mat;
+}
+void stairDetector::cluster_by_knn(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines)
+// void stairDetector::cluster_by_knn()
+{
+    ROS_WARN("Inside KNN");
+
+    return;
 }

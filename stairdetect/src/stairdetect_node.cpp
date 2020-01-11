@@ -11,6 +11,7 @@ int main(int argc, char **argv)
     // Mat tmp;
     // sd->filter_img(tmp);
     // sd->cluster_by_kmeans();
+    // sd->cluster_by_knn();
 
     ros::spin();
     return 0;
