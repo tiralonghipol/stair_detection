@@ -490,7 +490,8 @@ void stairDetector::cluster_by_kmeans(
     vector<Lines> &clustered_lines)
 {
     int i, j;
-    Mat points, labels, centers;
+    // Mat points, labels, centers;
+    Mat labels, centers;
 
     Scalar colorTab[] =
         {
