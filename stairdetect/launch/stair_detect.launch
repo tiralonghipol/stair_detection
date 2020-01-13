@@ -29,9 +29,11 @@
 
         <!-- timing -->
         <param name="stair_detect_timing" value="5.0" type="double"/>
+        
 
         <!-- line filtering -->
         <param name="num_line_clusters" value="8" type="int"/>
+        <param name="max_stair_width" value="2.5" type="double"/>
 
     </node>
 

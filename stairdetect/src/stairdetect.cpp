@@ -285,24 +285,24 @@ void stairDetector::process_clustered_lines(
     }
 
     // get covariance matrix for each filtered cluster
-    // vector<Eigen::Matrix2d> cov_mats;
-    // for (int i = 0; i < processed_lines.size(); i++)
-    // {
-    //     if (processed_lines[i].size() > 3)
-    //     {
-    //         Eigen::Matrix2d sigma = calc_covariance_matrix(processed_lines[i]);
-    //         cov_mats.push_back(sigma);
-    //         // std::cout << "\ncovariance for cluster: " << i << std::endl;
-    //         // std::cout << sigma(0, 0) << ",\t" << sigma(0, 1) << std::endl;
-    //         // std::cout << sigma(1, 0) << ",\t" << sigma(1, 1) << std::endl;
+    vector<Eigen::Matrix2d> cov_mats;
+    for (int i = 0; i < processed_lines.size(); i++)
+    {
+        if (processed_lines[i].size() > 3)
+        {
+            Eigen::Matrix2d sigma = calc_covariance_matrix(processed_lines[i]);
+            cov_mats.push_back(sigma);
+            // std::cout << "\ncovariance for cluster: " << i << std::endl;
+            // std::cout << sigma(0, 0) << ",\t" << sigma(0, 1) << std::endl;
+            // std::cout << sigma(1, 0) << ",\t" << sigma(1, 1) << std::endl;
 
-    //         // eigenvalues of covariance matrix
-    //         Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(sigma);
-    //         Eigen::Vector2d e_vals = eigensolver.eigenvalues();
-    //         // std::cout << "eigenvalues for cluster: " << i << std::endl;
-    //         // std::cout << e_vals << std::endl;
-    //     }
-    // }
+            // eigenvalues of covariance matrix
+            Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(sigma);
+            Eigen::Vector2d e_vals = eigensolver.eigenvalues();
+            // std::cout << "eigenvalues for cluster: " << i << std::endl;
+            // std::cout << e_vals << std::endl;
+        }
+    }
 
     return;
 }
@@ -690,6 +690,11 @@ void stairDetector::cluster_by_kmeans(
         ROS_INFO("Not enough points to perform kmeans ");
     }
     return;
+}
+
+void stairDetector::cluster_by_knn(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines)
+{
+    
 }
 
 Eigen::Matrix2d stairDetector::calc_covariance_matrix(const Lines &lines)
