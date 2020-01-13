@@ -65,6 +65,8 @@ struct stairDetectorParams
   // THESE SHOULD PROBABLY COME FROM LIDAR_STITCH_PARAMS
   double img_xy_dim = 25;
   double img_resolution = 0.02;
+
+  double max_stair_width = 2.5;
 };
 
 class stairDetector
@@ -84,24 +86,25 @@ public:
   void pcl_to_bird_view(const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg);
 
   // image operations
-  void pcl_to_bird_view_img(
-      const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, cv::Mat &img);
+  void pcl_to_bird_view_img(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, cv::Mat &img);
   void filter_img(cv::Mat &img);
   void canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge);
   void morph_filter(const cv::Mat &img_in, cv::Mat &img_out);
   void skeleton_filter(const cv::Mat &img_in, cv::Mat &img_out);
   void lsd_lines(const cv::Mat &img_in, Lines &lines);
   void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
+  void draw_clustered_lines(cv::Mat &image, const vector<Lines> &clustered_lines);
   void publish_img_msgs(cv::Mat &img_bird_view, cv::Mat &img_proc, cv::Mat &img_line, cv::Mat &img_line_filtered);
 
   // line processing
   void cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines);
+  void cluster_by_knn(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines);
+
   void process_clustered_lines(const vector<Lines> &clustered_lines, vector<Lines> &processed_lines);
   Lines filter_lines_by_angle(const Lines &lines_in);
   Lines filter_lines_by_mid_pts_dist(const Lines &lines_in);
+  Lines filter_lines_by_max_width(const Lines &lines_in);
   Eigen::Matrix2d calc_covariance_matrix(const Lines &lines);
-
-
 
   Scalar random_color(RNG &rng);
 

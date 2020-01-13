@@ -64,12 +64,6 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     {
         _colorTab.push_back(random_color(rng));
     }
-    // ROS_WARN("COLOR TAB SIZE = %d", _colorTab.size());
-    // for (int i = 0; i < _colorTab.size(); i++)
-    // {
-    //     cout << _colorTab[i] << endl;
-    // }
-
     setParam(_param);
 }
 
@@ -133,6 +127,7 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
     _param.lsd_log_eps = config.lsd_log_eps;
     _param.lsd_density_th = config.lsd_density_th;
 
+    _param.max_stair_width = config.max_stair_width;
     setParam(_param);
     return;
 }
@@ -218,8 +213,8 @@ void stairDetector::filter_img(cv::Mat &raw_img)
     // Mat proc_img, line_img, filtered_line_img;
     Mat line_img, filtered_line_img;
 
-    Mat proc_img(raw_img.size(), CV_8UC1);
-
+    Mat proc_img = raw_img.clone();
+    // Mat filtered_line_img = raw_img.clone();
     // edge detection
     // canny_edge_detect(img, edge_img);
 
@@ -228,13 +223,10 @@ void stairDetector::filter_img(cv::Mat &raw_img)
     // Mat t_img;
     // threshold(morph_img, t_img, 0, 255, THRESH_BINARY);
     // skeleton_filter(morph_img, proc_img);
-    // skeleton_filter(t_img, proc_img);
-    // threshold(proc_img, proc_img, 0, 255, THRESH_BINARY);
 
     // ---------------------------------------- //
     morph_filter(raw_img, proc_img);
 
-    // bilateralFilter(edge_img, blurred_img, 3, 500, 250);
     // medianBlur(edge_img, edge_img, 3);
     // cvtColor(edge_img, edge_img, CV_BINA);
 
@@ -246,16 +238,20 @@ void stairDetector::filter_img(cv::Mat &raw_img)
     {
         // plot lines on image
         cvtColor(proc_img, line_img, CV_GRAY2BGR);
+        cvtColor(proc_img, filtered_line_img, CV_GRAY2BGR);
         draw_lines(line_img, lines, Scalar(255, 0, 0));
 
         // line clustering
         vector<Lines> clustered_lines;
-
         cluster_by_kmeans(line_img, lines, clustered_lines);
-        // draw_lines(filtered_line_img, filtered_lines, Scalar(0, 255, 0));
+        draw_clustered_lines(line_img, clustered_lines);
 
         vector<Lines> processed_lines;
         process_clustered_lines(clustered_lines, processed_lines);
+
+        for (int i = 0; i < processed_lines.size(); i++)
+            draw_lines(filtered_line_img, processed_lines[i], Scalar(0, 0, 255));
+        draw_clustered_lines(filtered_line_img, processed_lines);
 
         if (_param.debug)
         {
@@ -281,32 +277,49 @@ void stairDetector::process_clustered_lines(
         // std::cout << "\nCLUSTER:\t" << i << std::endl;
 
         // remove lines in cluster which do not meet geometric constraints
+        // Lines filt_lines = filter_lines_by_mid_pts_dist(clustered_lines[i]);
         Lines filt_lines = filter_lines_by_angle(clustered_lines[i]);
         filt_lines = filter_lines_by_mid_pts_dist(filt_lines);
+        filt_lines = filter_lines_by_max_width(filt_lines);
         processed_lines.push_back(filt_lines);
     }
 
     // get covariance matrix for each filtered cluster
-    vector<Eigen::Matrix2d> cov_mats;
-    for (int i = 0; i < processed_lines.size(); i++)
-    {
-        if (processed_lines[i].size() > 3)
-        {
-            Eigen::Matrix2d sigma = calc_covariance_matrix(processed_lines[i]);
-            cov_mats.push_back(sigma);
-            // std::cout << "\ncovariance for cluster: " << i << std::endl;
-            // std::cout << sigma(0, 0) << ",\t" << sigma(0, 1) << std::endl;
-            // std::cout << sigma(1, 0) << ",\t" << sigma(1, 1) << std::endl;
+    // vector<Eigen::Matrix2d> cov_mats;
+    // for (int i = 0; i < processed_lines.size(); i++)
+    // {
+    //     if (processed_lines[i].size() > 3)
+    //     {
+    //         Eigen::Matrix2d sigma = calc_covariance_matrix(processed_lines[i]);
+    //         cov_mats.push_back(sigma);
+    //         // std::cout << "\ncovariance for cluster: " << i << std::endl;
+    //         // std::cout << sigma(0, 0) << ",\t" << sigma(0, 1) << std::endl;
+    //         // std::cout << sigma(1, 0) << ",\t" << sigma(1, 1) << std::endl;
 
-            // eigenvalues of covariance matrix
-            Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(sigma);
-            Eigen::Vector2d e_vals = eigensolver.eigenvalues();
-            // std::cout << "eigenvalues for cluster: " << i << std::endl;
-            // std::cout << e_vals << std::endl;
-        }
-    }
+    //         // eigenvalues of covariance matrix
+    //         Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(sigma);
+    //         Eigen::Vector2d e_vals = eigensolver.eigenvalues();
+    //         // std::cout << "eigenvalues for cluster: " << i << std::endl;
+    //         // std::cout << e_vals << std::endl;
+    //     }
+    // }
 
     return;
+}
+
+Lines stairDetector::filter_lines_by_max_width(
+    const Lines &lines)
+{
+    Lines filt_lines = lines;
+
+    for (int i = 0; i < lines.size(); i++)
+    {
+        ROS_WARN("filt_lines[%d].lenght = %f", i, lines[i].length);
+        if (filt_lines[i].length * _param.img_resolution > _param.max_stair_width)
+            filt_lines.erase(filt_lines.begin() + i);
+    }
+
+    return filt_lines;
 }
 
 Lines stairDetector::filter_lines_by_mid_pts_dist(
@@ -319,7 +332,7 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
 
     if (lines.size() > 3)
     {
-        for (int i = 0; i < lines.size(); i++)
+        for (int i = 0; i < lines.size() - 1; i++)
         {
             for (int j = 0; j < lines.size(); j++)
             {
@@ -342,8 +355,10 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
             // initialize the minimum element as big
             int minm = 999;
 
-            for (int j = i + 1; j < distances.cols; j++)
+            for (int j = 0; j < distances.cols; j++)
             {
+                // if (i == j)
+                //     continue;
                 //  check for minimum  in each row of the matrix
                 if (distances.at<float>(i, j) < minm && distances.at<float>(i, j) > 0)
                     minm = distances.at<float>(i, j);
@@ -358,28 +373,45 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
             }
         }
 
-        for (int i = 0; i < lines.size(); i++)
-        {
-            std::cout << "min dist = " << min_dists[i] << "\t";
-            for (int j = 0; j < lines.size(); j++)
-            {
-                std::cout << distances.at<float>(i, j) << " ";
-            }
-            std::cout << "\n";
-        }
-        std::cout << "---------------------"
+        // for (int i = 0; i < lines.size() - 1; i++)
+        // {
+        //     std::cout << "min dist = " << min_dists[i] << "\t";
+        //     for (int j = 0; j < lines.size(); j++)
+        //     {
+        //         std::cout << distances.at<float>(i, j) << " ";
+        //     }
+        //     std::cout << "\n";
+        // }
+
+        // std::cout << "---------------------------------"
+        //           << "\n";
+        // double sum = 0;
+        // double mean = 0;
+        double sum = std::accumulate(min_dists.begin(), min_dists.end(), 0.0);
+        double mean = sum / min_dists.size();
+
+        std::vector<double> diff(min_dists.size());
+        std::transform(min_dists.begin(), min_dists.end(), diff.begin(), [mean](double x) { return x - mean; });
+
+        double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+        double stdev = std::sqrt(sq_sum / min_dists.size());
+        cout << "Mean = " << mean << endl;
+        cout << "Variance = " << stdev << endl;
+        std::cout << "---------------------------------"
                   << "\n";
+
+        if (stdev < 13)
+        {
+            // std::cout << "Potential Stair !" << endl;
+            filt_lines = lines;
+        }
+        else
+        {
+            filt_lines = {};
+        }
     }
-    
-
-    accumulator_set<double, stats<tag::variance>> acc;
-    for_each(min_dists.begin(), min_dists.end(), bind<void>(ref(acc), _1));
-
-    cout << boost::mean(acc) << endl;
-    cout << sqrt(boost::variance(acc)) << endl;
 
     min_dists.clear();
-    filt_lines = lines;
     return filt_lines;
 }
 
@@ -548,6 +580,20 @@ void stairDetector::draw_lines(cv::Mat &image, const Lines &lines, const cv::Sca
     }
 }
 
+void stairDetector::draw_clustered_lines(cv::Mat &image, const vector<Lines> &clustered_lines)
+{
+    int i, j;
+    for (j = 0; j < clustered_lines.size(); j++)
+    {
+        for (i = 0; i < clustered_lines[j].size(); i++)
+        {
+            Point ipt = clustered_lines[j][i].p_mid;
+            circle(image, ipt, 8, _colorTab[j], 2, 8);
+        }
+    }
+    return;
+}
+
 void stairDetector::lsd_lines(const cv::Mat &img_in, Lines &lines)
 {
     vector<Vec4i> xy_lines;
@@ -567,7 +613,6 @@ void stairDetector::lsd_lines(const cv::Mat &img_in, Lines &lines)
         Line line(xy_lines[i]);
         line.calPixels(img_in);
         lines.push_back(line);
-        // cout << lines[i];
     }
     ROS_INFO_ONCE("Found %d lines", lines.size());
     return;
@@ -626,22 +671,19 @@ void stairDetector::cluster_by_kmeans(
             clustered_lines.push_back(tmp);
         }
 
-        vector<Lines> processed_lines;
-        process_clustered_lines(clustered_lines, processed_lines);
+        // vector<Lines> processed_lines;
+        // process_clustered_lines(clustered_lines, processed_lines);
 
-        for (j = 0; j < _max_clusters; j++)
-        {
-            // ROS_INFO("%d", clustered_lines[j].size());
-            if (processed_lines[j].size() > 3)
-            {
-                for (i = 0; i < processed_lines[j].size(); i++)
-                {
-                    // Point ipt = clustered_lines[j][i].p_mid;
-                    Point ipt = processed_lines[j][i].p_mid;
-                    circle(img, ipt, 10, _colorTab[j], 2, 8);
-                }
-            }
-        }
+        // for (j = 0; j < _max_clusters; j++)
+        // {
+        //     if (processed_lines[j].size() > 3)
+        //     {
+        //         for (i = 0; i < processed_lines[j].size(); i++)
+        //         {
+        //             Point ipt = processed_lines[j][i].p_mid;
+        //         }
+        //     }
+        // }
     }
     else
     {
