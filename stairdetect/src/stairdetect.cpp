@@ -244,6 +244,7 @@ void stairDetector::filter_img(cv::Mat &raw_img)
         // line clustering
         vector<Lines> clustered_lines;
         cluster_by_kmeans(line_img, lines, clustered_lines);
+        // cluster_by_knn(line_img, lines, clustered_lines);
         draw_clustered_lines(line_img, clustered_lines);
 
         vector<Lines> processed_lines;
@@ -633,25 +634,34 @@ void stairDetector::cluster_by_kmeans(
 
     // Method 1) use only x,y
     Mat points;
+    Mat slopes(lines.size(), 3, CV_32F);
+
     for (i = 0; i < lines.size(); i++)
     {
         points.push_back(lines[i].p_mid);
+        // slopes.push_back(lines[i].k);
     }
+    // Mat slopes;
 
     // Method 2) use both x,y and slope
-    // Mat points(lines.size(), 2, CV_32F);
-    // for (i = 0; i < lines.size(); i++)
-    // {
-    // points.at<float>(i, 0) = lines[i].p_mid.x;
-    // points.at<float>(i, 1) = lines[i].p_mid.y;
-    // points.at<float>(i, 2) = lines[i].k;
-    // }
+    for (i = 0; i < lines.size(); i++)
+    {
+        slopes.at<float>(i, 0) = lines[i].p_mid.x;
+        slopes.at<float>(i, 1) = lines[i].p_mid.y;
+        if (isinf(lines[i].k))
+            slopes.at<float>(i, 2) = 9999;
+        else
+            slopes.at<float>(i, 2) = lines[i].k;
+    }
+
+    std::cout << slopes << std::endl;
 
     if (points.rows >= _max_clusters)
     {
         double compactness = kmeans(points, _max_clusters, labels,
                                     TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 50, 1.0),
                                     3, KMEANS_PP_CENTERS, centers);
+        std::cout << "here" << std::endl;
         Lines tmp;
 
         for (i = 0; i < lines.size(); i++)
@@ -659,6 +669,10 @@ void stairDetector::cluster_by_kmeans(
             int clusterIdx = labels.at<int>(i);
             lines[i].cluster_id = clusterIdx;
         }
+
+        // kmeans(slopes, _max_clusters, labels,
+        //        TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 50, 1.0),
+        //        3, KMEANS_PP_CENTERS, centers);
 
         for (j = 0; j < _max_clusters; j++)
         {
@@ -692,10 +706,6 @@ void stairDetector::cluster_by_kmeans(
     return;
 }
 
-void stairDetector::cluster_by_knn(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines)
-{
-    
-}
 
 Eigen::Matrix2d stairDetector::calc_covariance_matrix(const Lines &lines)
 {

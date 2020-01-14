@@ -68,7 +68,7 @@ public:
     }
   }
 
-  friend Vec2d get_tangent_unit_vector(const Line & line)
+  friend Vec2d get_tangent_unit_vector(const Line &line)
   {
     // returns a unit tangent vector to the line
     Vec2d tangent;
@@ -82,7 +82,7 @@ public:
     return tangent;
   }
 
-  friend Vec2d get_normal_unit_vector(const Line & line)
+  friend Vec2d get_normal_unit_vector(const Line &line)
   {
     // returns a unit normal vector to the line
     Vec2d normal;
@@ -94,7 +94,7 @@ public:
     return normal;
   }
 
-  friend Vec2d get_dist_unit_vector(const Line & l_1, const Line & l_2)
+  friend Vec2d get_dist_unit_vector(const Line &l_1, const Line &l_2)
   {
     // returns unit vector in direction of vector connecting line mindpoints
     Vec2d dist_vec;
@@ -109,7 +109,7 @@ public:
   friend std::ostream &operator<<(std::ostream &os, const Line &line)
   {
     os << "P1: " << line.p1
-       << "\tP2: " << line.p2 
+       << "\tP2: " << line.p2
        << "\tk: " << line.k
        << "\tid: " << line.cluster_id << "\n";
     // os << "\nPoint1: " << line.p1 << " Point2: " << line.p2 << " k:" << line.k
@@ -128,6 +128,9 @@ public:
   double p_mid_z = 0;
   // cv::LineIterator it;
   std::vector<cv::Point> pixels;
+
+// private:
+
 };
 typedef std::vector<Line> Lines;
 
