@@ -246,8 +246,13 @@ void stairDetector::filter_img(cv::Mat &raw_img)
         cluster_by_kmeans(line_img, lines, clustered_lines);
         draw_clustered_lines(line_img, clustered_lines);
 
+        // sub-clustering based on line orientation
+        vector<Lines> subclustered_lines;
+        subclustered_lines = subcluster_by_orientation(clustered_lines);
+
         vector<Lines> processed_lines;
-        process_clustered_lines(clustered_lines, processed_lines);
+        // process_clustered_lines(clustered_lines, processed_lines);
+        process_clustered_lines(subclustered_lines, processed_lines);
 
         for (int i = 0; i < processed_lines.size(); i++)
             draw_lines(filtered_line_img, processed_lines[i], Scalar(0, 0, 255));
@@ -273,38 +278,40 @@ void stairDetector::process_clustered_lines(
     processed_lines.clear();
     for (int i = 0; i < clustered_lines.size(); i++)
     {
-
-        // std::cout << "\nCLUSTER:\t" << i << std::endl;
-
+        std::cout << "\nCLUSTER:\t" << i << std::endl;
+        std::cout << clustered_lines[i].size() << std::endl;
+        Lines filt_lines;
         // remove lines in cluster which do not meet geometric constraints
-        // Lines filt_lines = filter_lines_by_mid_pts_dist(clustered_lines[i]);
-        Lines filt_lines = filter_lines_by_angle(clustered_lines[i]);
-        filt_lines = filter_lines_by_mid_pts_dist(filt_lines);
+        filt_lines = filter_lines_by_mid_pts_dist(clustered_lines[i]);
         filt_lines = filter_lines_by_max_width(filt_lines);
         processed_lines.push_back(filt_lines);
-    }
-
-    // get covariance matrix for each filtered cluster
-    vector<Eigen::Matrix2d> cov_mats;
-    for (int i = 0; i < processed_lines.size(); i++)
-    {
-        if (processed_lines[i].size() > 3)
-        {
-            Eigen::Matrix2d sigma = calc_covariance_matrix(processed_lines[i]);
-            cov_mats.push_back(sigma);
-            // std::cout << "\ncovariance for cluster: " << i << std::endl;
-            // std::cout << sigma(0, 0) << ",\t" << sigma(0, 1) << std::endl;
-            // std::cout << sigma(1, 0) << ",\t" << sigma(1, 1) << std::endl;
-
-            // eigenvalues of covariance matrix
-            Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(sigma);
-            Eigen::Vector2d e_vals = eigensolver.eigenvalues();
-            // std::cout << "eigenvalues for cluster: " << i << std::endl;
-            // std::cout << e_vals << std::endl;
-        }
+        Lines dummy = filter_lines_by_covariance(filt_lines);
     }
 
     return;
+}
+
+Lines stairDetector::filter_lines_by_covariance(
+    const Lines & lines) 
+{
+    Lines filt_lines;
+
+    // get covariance matrix for each cluster
+    if (lines.size() > 3)
+    {
+        Eigen::Matrix2d sigma = calc_covariance_matrix(lines);
+        // cov_mats.push_back(sigma);
+        std::cout << "\ncovariance for cluster: " << std::endl;
+        std::cout << sigma(0, 0) << ",\t" << sigma(0, 1) << std::endl;
+        std::cout << sigma(1, 0) << ",\t" << sigma(1, 1) << std::endl;
+
+        // eigenvalues of covariance matrix
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(sigma);
+        Eigen::Vector2d e_vals = eigensolver.eigenvalues();
+        std::cout << "eigenvalues for cluster: " << std::endl;
+        std::cout << e_vals << std::endl;
+    }
+    return filt_lines;
 }
 
 Lines stairDetector::filter_lines_by_max_width(
@@ -415,11 +422,33 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
     return filt_lines;
 }
 
-Lines stairDetector::filter_lines_by_angle(
+vector<Lines> stairDetector::subcluster_by_orientation(
+    const vector<Lines> & clustered_lines)
+{
+    vector<Lines> new_clusters;
+    for( int i = 0; i < clustered_lines.size(); i++ )
+    {
+        vector<Lines> temp;
+        temp = filter_lines_by_angle(clustered_lines[i]);
+        if( temp[0].size() > 0 )
+        {
+            new_clusters.push_back(temp[0]);
+        }
+        if( temp[1].size() > 0 )
+        {
+            new_clusters.push_back(temp[1]);
+        }
+    }
+    return new_clusters;
+}
+
+vector <Lines> stairDetector::filter_lines_by_angle(
     const Lines &lines)
 {
     // filtered lines have outliers (lines perpendicular to majority removed)
-    Lines filt_lines;
+    Lines filt_lines_0;
+    Lines filt_lines_1;
+    vector<Lines> angular_clusters;
 
     // element i, j is dot product between normals of lines i, j
     Eigen::MatrixXf normal_dot_prods(lines.size(), lines.size());
@@ -434,49 +463,104 @@ Lines stairDetector::filter_lines_by_angle(
             dot_prod = n_i[0] * n_j[0] + n_i[1] * n_j[1];
             normal_dot_prods(i, j) = abs(dot_prod);
             normal_dot_prods(j, i) = 0.0;
-            // std::cout << "normal dot prod: \t" << dot_prod << std::endl;
         }
     }
 
-    // element i, j is dot product between normal of i
-    // and distance vector between i and j
-    Eigen::MatrixXf normal_dist_dot_prods(lines.size(), lines.size());
-    for (int i = 0; i < lines.size(); i++)
-    {
-        normal_dist_dot_prods(i, i) = 1.0;
-        for (int j = i + 1; j < lines.size(); j++)
-        {
-            double dot_prod = 0;
-            Vec2d n_i = get_normal_unit_vector(lines[j]);
-            Vec2d d_ij = get_dist_unit_vector(lines[i], lines[j]);
-            dot_prod = n_i[0] * d_ij[0] + n_i[1] * d_ij[1];
-            normal_dist_dot_prods(i, j) = abs(dot_prod);
-            normal_dist_dot_prods(j, i) = 0.0;
-            // std::cout << "dot prod: \t" << dot_prod << std::endl;
-        }
-    }
+    double max_sum = 0;
+    int max_row = 0;
 
-    for (int i = 0; i < lines.size(); i++)
+    for( int i = 0; i < lines.size(); i++ )
     {
         double norm_prod_sum = 0;
-        double dist_prod_sum = 0;
-        for (int j = 0; j < lines.size(); j++)
+        for (int j = 0; j < lines.size(); j++ )
         {
             norm_prod_sum += normal_dot_prods(i, j);
-            dist_prod_sum += normal_dist_dot_prods(i, j);
         }
 
-        // don't add outliers w.r.t. normal dot prods, dist dot prods
-        if ((norm_prod_sum - 1.0) / double(lines.size() - 1.0) > 0.3 && (dist_prod_sum - 1.0) / double(lines.size() - 1.0) > 0.0)
+        if( norm_prod_sum > max_sum )
         {
-            filt_lines.push_back(lines[i]);
+            max_row = i;
+            max_sum = norm_prod_sum;
         }
     }
 
-    // std::cout << "initial number of lines:\t" << lines.size() << std::endl;
-    // std::cout << "number of lines after filter:\t" << filt_lines.size() << std::endl;
+    // separate lines in cluster by orientation 
+    for( int i = 0; i < lines.size(); i++ )
+    {
+        if( normal_dot_prods(max_row, i) > 0.7071 )
+        {
+            filt_lines_0.push_back(lines[i]);
+        }
+        else 
+        {
+            filt_lines_1.push_back(lines[i]);
+        }
+    }
 
-    return filt_lines;
+    angular_clusters.push_back(filt_lines_0);
+    angular_clusters.push_back(filt_lines_1);
+
+    return angular_clusters;
+
+
+    // --------------- INITIAL VERSION ----------------- //
+    // // filtered lines have outliers (lines perpendicular to majority removed)
+    // Lines filt_lines;
+
+    // // element i, j is dot product between normals of lines i, j
+    // Eigen::MatrixXf normal_dot_prods(lines.size(), lines.size());
+    // for (int i = 0; i < lines.size(); i++)
+    // {
+    //     normal_dot_prods(i, i) = 1.0;
+    //     for (int j = i + 1; j < lines.size(); j++)
+    //     {
+    //         double dot_prod = 0;
+    //         Vec2d n_i = get_normal_unit_vector(lines[i]);
+    //         Vec2d n_j = get_normal_unit_vector(lines[j]);
+    //         dot_prod = n_i[0] * n_j[0] + n_i[1] * n_j[1];
+    //         normal_dot_prods(i, j) = abs(dot_prod);
+    //         normal_dot_prods(j, i) = 0.0;
+    //         // std::cout << "normal dot prod: \t" << dot_prod << std::endl;
+    //     }
+    // }
+
+    // // element i, j is dot product between normal of i
+    // // and distance vector between i and j
+    // Eigen::MatrixXf normal_dist_dot_prods(lines.size(), lines.size());
+    // for (int i = 0; i < lines.size(); i++)
+    // {
+    //     normal_dist_dot_prods(i, i) = 1.0;
+    //     for (int j = i + 1; j < lines.size(); j++)
+    //     {
+    //         double dot_prod = 0;
+    //         Vec2d n_i = get_normal_unit_vector(lines[j]);
+    //         Vec2d d_ij = get_dist_unit_vector(lines[i], lines[j]);
+    //         dot_prod = n_i[0] * d_ij[0] + n_i[1] * d_ij[1];
+    //         normal_dist_dot_prods(i, j) = abs(dot_prod);
+    //         normal_dist_dot_prods(j, i) = 0.0;
+    //         // std::cout << "dot prod: \t" << dot_prod << std::endl;
+    //     }
+    // }
+
+    // for (int i = 0; i < lines.size(); i++)
+    // {
+    //     double norm_prod_sum = 0;
+    //     double dist_prod_sum = 0;
+    //     for (int j = 0; j < lines.size(); j++)
+    //     {
+    //         norm_prod_sum += normal_dot_prods(i, j);
+    //         dist_prod_sum += normal_dist_dot_prods(i, j);
+    //     }
+
+    //     // don't add outliers w.r.t. normal dot prods, dist dot prods
+    //     if ((norm_prod_sum - 1.0) / double(lines.size() - 1.0) > 0.3 && (dist_prod_sum - 1.0) / double(lines.size() - 1.0) > 0.0)
+    //     {
+    //         filt_lines.push_back(lines[i]);
+    //     }
+    // }
+    // --------------- INITIAL VERSION ----------------- //
+
+    // return filt_lines;
 }
 
 void stairDetector::publish_img_msgs(
