@@ -82,12 +82,11 @@ public:
   void callback_dyn_reconf(stairdetect::StairDetectConfig &config, uint32_t level);
 
   // other functions
-  void trim_stitched_pcl(pcl::PCLPointCloud2 &trimmed_cloud);
   void pcl_to_bird_view(const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg);
 
   // image operations
   void pcl_to_bird_view_img(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, cv::Mat &img);
-  void filter_img(cv::Mat &img);
+  vector<vector<vector<cv::Point>>> filter_img(cv::Mat &img);
   void canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge);
   void morph_filter(const cv::Mat &img_in, cv::Mat &img_out);
   void skeleton_filter(const cv::Mat &img_in, cv::Mat &img_out);
@@ -107,8 +106,12 @@ public:
   Lines filter_lines_by_max_width(const Lines &lines_in);
   Lines filter_lines_by_covariance(const Lines &lines_in);
   Eigen::Matrix2d calc_covariance_matrix(const Lines &lines);
+  vector<vector<cv::Point>> calculate_cluster_bounds(const Lines & lines);
+  vector<double> px_to_m(const cv::Point & pt);
 
   Scalar random_color(RNG &rng);
+
+  cv::Point calc_centroid_pixel(const vector<cv::Point> & hull);
 
 private:
   // subscribers
@@ -140,6 +143,7 @@ private:
 
   // reference to most recently-received cloud
   pcl::PointCloud<pcl::PointXYZ>::Ptr _recent_cloud;
+  geometry_msgs::PoseWithCovarianceStamped _recent_pose;
 
   // parameter container
   stairDetectorParams _param;
