@@ -35,6 +35,7 @@
 #include <dynamic_reconfigure/server.h>
 #include <stairdetect/StairDetectConfig.h>
 
+
 using namespace std;
 using namespace cv;
 using namespace cv::ml;
@@ -92,13 +93,17 @@ public:
   void morph_filter(const cv::Mat &img_in, cv::Mat &img_out);
   void skeleton_filter(const cv::Mat &img_in, cv::Mat &img_out);
   void lsd_lines(const cv::Mat &img_in, Lines &lines);
+
+  // visualization
   void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
   void draw_clustered_lines(cv::Mat &image, const vector<Lines> &clustered_lines);
+  void draw_bounding_box(cv::Mat &image, const std::vector<cv::Point> &bounding_box);
+
+  // publish
   void publish_img_msgs(cv::Mat &img_bird_view, cv::Mat &img_proc, cv::Mat &img_line, cv::Mat &img_line_filtered);
 
   // line processing
   void cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines);
-  void cluster_by_knn(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines);
 
   void process_clustered_lines(const vector<Lines> &clustered_lines, vector<Lines> &processed_lines);
   vector<Lines> subcluster_by_orientation(const vector<Lines> &clustered_lines);
@@ -106,9 +111,12 @@ public:
   Lines filter_lines_by_mid_pts_dist(const Lines &lines_in);
   Lines filter_lines_by_max_width(const Lines &lines_in);
   Lines filter_lines_by_covariance(const Lines &lines_in);
+  Lines filter_lines_by_mid_pts_line_fit(const Lines &lines_in);
   Eigen::Matrix2d calc_covariance_matrix(const Lines &lines);
 
   Scalar random_color(RNG &rng);
+
+  bool get_bounding_box(const cv::Mat &input_image, const Lines &lines, std::vector<cv::Point> &bounding_box);
 
 private:
   // subscribers

@@ -2,9 +2,3 @@
 	path = lidar_stitch
 	url = https://github.com/unr-arl/lidar_stitch.git
 	branch = lidar_stitch_staircase
-[submodule "rtl"]
-	path = rtl
-	url = https://github.com/sunglok/rtl.git
-[submodule "TheiaSfM"]
-	path = TheiaSfM
-	url = https://github.com/sweeneychris/TheiaSfM.git

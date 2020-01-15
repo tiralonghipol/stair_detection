@@ -244,7 +244,6 @@ void stairDetector::filter_img(cv::Mat &raw_img)
         // line clustering
         vector<Lines> clustered_lines;
         cluster_by_kmeans(line_img, lines, clustered_lines);
-        // cluster_by_knn(line_img, lines, clustered_lines);
         draw_clustered_lines(line_img, clustered_lines);
 
         // sub-clustering based on line orientation
@@ -255,8 +254,24 @@ void stairDetector::filter_img(cv::Mat &raw_img)
         // process_clustered_lines(clustered_lines, processed_lines);
         process_clustered_lines(subclustered_lines, processed_lines);
 
-        for (int i = 0; i < processed_lines.size(); i++)
-            draw_lines(filtered_line_img, processed_lines[i], Scalar(0, 0, 255));
+        // vector<Point> bounding_box;
+
+        // for (int i = 0; i < processed_lines.size(); i++)
+        // {
+        //     draw_lines(filtered_line_img, processed_lines[i], Scalar(0, 0, 255));
+        //     if (processed_lines[i].size() > 2)
+        //     {
+        //         if (get_bounding_box(filtered_line_img, processed_lines[i], bounding_box))
+        //         {
+        //             cout << "Found Stair !" << endl;
+        //             draw_bounding_box(filtered_line_img, bounding_box);
+        //         }
+        //         else
+        //         {
+        //             cout << "No Stair , keep trying" << endl;
+        //         }
+        //     }
+        // }
         draw_clustered_lines(filtered_line_img, processed_lines);
 
         if (_param.debug)
@@ -277,23 +292,25 @@ void stairDetector::process_clustered_lines(
     vector<Lines> &processed_lines)
 {
     processed_lines.clear();
+
     for (int i = 0; i < clustered_lines.size(); i++)
     {
         std::cout << "\nCLUSTER:\t" << i << std::endl;
         std::cout << clustered_lines[i].size() << std::endl;
         Lines filt_lines;
         // remove lines in cluster which do not meet geometric constraints
-        filt_lines = filter_lines_by_mid_pts_dist(clustered_lines[i]);
-        filt_lines = filter_lines_by_max_width(filt_lines);
+        // filt_lines = filter_lines_by_mid_pts_dist(clustered_lines[i]);
+        // filt_lines = filter_lines_by_max_width(filt_lines);
+        filt_lines = filter_lines_by_mid_pts_line_fit(clustered_lines[i]);
         processed_lines.push_back(filt_lines);
-        Lines dummy = filter_lines_by_covariance(filt_lines);
+        // Lines dummy = filter_lines_by_covariance(filt_lines);
     }
 
     return;
 }
 
 Lines stairDetector::filter_lines_by_covariance(
-    const Lines & lines) 
+    const Lines &lines)
 {
     Lines filt_lines;
 
@@ -424,18 +441,18 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
 }
 
 vector<Lines> stairDetector::subcluster_by_orientation(
-    const vector<Lines> & clustered_lines)
+    const vector<Lines> &clustered_lines)
 {
     vector<Lines> new_clusters;
-    for( int i = 0; i < clustered_lines.size(); i++ )
+    for (int i = 0; i < clustered_lines.size(); i++)
     {
         vector<Lines> temp;
         temp = filter_lines_by_angle(clustered_lines[i]);
-        if( temp[0].size() > 0 )
+        if (temp[0].size() > 0)
         {
             new_clusters.push_back(temp[0]);
         }
-        if( temp[1].size() > 0 )
+        if (temp[1].size() > 0)
         {
             new_clusters.push_back(temp[1]);
         }
@@ -443,7 +460,7 @@ vector<Lines> stairDetector::subcluster_by_orientation(
     return new_clusters;
 }
 
-vector <Lines> stairDetector::filter_lines_by_angle(
+vector<Lines> stairDetector::filter_lines_by_angle(
     const Lines &lines)
 {
     // filtered lines have outliers (lines perpendicular to majority removed)
@@ -470,29 +487,29 @@ vector <Lines> stairDetector::filter_lines_by_angle(
     double max_sum = 0;
     int max_row = 0;
 
-    for( int i = 0; i < lines.size(); i++ )
+    for (int i = 0; i < lines.size(); i++)
     {
         double norm_prod_sum = 0;
-        for (int j = 0; j < lines.size(); j++ )
+        for (int j = 0; j < lines.size(); j++)
         {
             norm_prod_sum += normal_dot_prods(i, j);
         }
 
-        if( norm_prod_sum > max_sum )
+        if (norm_prod_sum > max_sum)
         {
             max_row = i;
             max_sum = norm_prod_sum;
         }
     }
 
-    // separate lines in cluster by orientation 
-    for( int i = 0; i < lines.size(); i++ )
+    // separate lines in cluster by orientation
+    for (int i = 0; i < lines.size(); i++)
     {
-        if( normal_dot_prods(max_row, i) > 0.7071 )
+        if (normal_dot_prods(max_row, i) > 0.7071)
         {
             filt_lines_0.push_back(lines[i]);
         }
-        else 
+        else
         {
             filt_lines_1.push_back(lines[i]);
         }
@@ -502,7 +519,6 @@ vector <Lines> stairDetector::filter_lines_by_angle(
     angular_clusters.push_back(filt_lines_1);
 
     return angular_clusters;
-
 
     // --------------- INITIAL VERSION ----------------- //
     // // filtered lines have outliers (lines perpendicular to majority removed)
@@ -743,9 +759,9 @@ void stairDetector::cluster_by_kmeans(
     if (points.rows >= _max_clusters)
     {
         double compactness = kmeans(points, _max_clusters, labels,
-                                    TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 50, 1.0),
+                                    TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 10, 10.0),
                                     3, KMEANS_PP_CENTERS, centers);
-        std::cout << "here" << std::endl;
+
         Lines tmp;
 
         for (i = 0; i < lines.size(); i++)
@@ -753,10 +769,6 @@ void stairDetector::cluster_by_kmeans(
             int clusterIdx = labels.at<int>(i);
             lines[i].cluster_id = clusterIdx;
         }
-
-        // kmeans(slopes, _max_clusters, labels,
-        //        TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 50, 1.0),
-        //        3, KMEANS_PP_CENTERS, centers);
 
         for (j = 0; j < _max_clusters; j++)
         {
@@ -768,20 +780,6 @@ void stairDetector::cluster_by_kmeans(
             }
             clustered_lines.push_back(tmp);
         }
-
-        // vector<Lines> processed_lines;
-        // process_clustered_lines(clustered_lines, processed_lines);
-
-        // for (j = 0; j < _max_clusters; j++)
-        // {
-        //     if (processed_lines[j].size() > 3)
-        //     {
-        //         for (i = 0; i < processed_lines[j].size(); i++)
-        //         {
-        //             Point ipt = processed_lines[j][i].p_mid;
-        //         }
-        //     }
-        // }
     }
     else
     {
@@ -789,7 +787,6 @@ void stairDetector::cluster_by_kmeans(
     }
     return;
 }
-
 
 Eigen::Matrix2d stairDetector::calc_covariance_matrix(const Lines &lines)
 {
@@ -817,4 +814,111 @@ Eigen::Matrix2d stairDetector::calc_covariance_matrix(const Lines &lines)
     cov_mat = data_mat.transpose() * data_mat;
     cov_mat /= float(lines.size());
     return cov_mat;
+}
+
+bool stairDetector::get_bounding_box(const cv::Mat &input_image, const Lines &lines, std::vector<cv::Point> &bounding_box)
+
+{
+    bounding_box.clear();
+    std::vector<int> valid_ids;
+
+    int left_most = input_image.cols;
+    int right_most = -1;
+    int up_most = input_image.rows;
+    int down_most = -1;
+    vector<double> x_vals;
+
+    for (int i = 0; i < lines.size(); i++)
+    {
+        for (int j = 0; j < lines[i].pixels.size(); j++)
+        {
+
+            int x1 = lines[i].p1.x;
+            int x2 = lines[i].p2.x;
+            if (x1 < left_most)
+            {
+                left_most = x1;
+            }
+            if (x1 > right_most)
+            {
+                right_most = x1;
+            }
+            if (x2 < left_most)
+            {
+                left_most = x2;
+            }
+            if (x2 > right_most)
+            {
+                right_most = x2;
+            }
+            valid_ids.push_back(i);
+            break;
+        }
+    }
+    for (int i = 0; i < valid_ids.size(); i++)
+    {
+        int id = valid_ids[i];
+        // ignore lines if it's length is smaller than 20
+        if (lines[id].length < 20)
+        {
+            continue;
+        }
+        for (int j = 0; j < lines[id].pixels.size(); j++)
+        {
+            int x = lines[id].pixels[j].x;
+            int y = lines[id].pixels[j].y;
+            if (x < left_most || x > right_most)
+            {
+                break;
+            }
+            if (y < up_most)
+            {
+                up_most = y;
+            }
+            if (y > down_most)
+            {
+                down_most = y;
+            }
+        }
+    }
+    cv::Point p1(left_most, up_most);
+    cv::Point p2(right_most, down_most);
+
+    bounding_box.push_back(p1);
+    bounding_box.push_back(p2);
+    return true;
+}
+
+void stairDetector::draw_bounding_box(cv::Mat &image, const std::vector<cv::Point> &bounding_box)
+{
+    if (bounding_box.size() != 2)
+    {
+        if (_param.debug)
+        {
+            std::cout << "Can't draw boxes because the point size is not equal to 2" << std::endl;
+        }
+        return;
+    }
+    cv::rectangle(image, bounding_box[0], bounding_box[1], cv::Scalar(0, 255, 0), 3, 8);
+}
+
+Lines stairDetector::filter_lines_by_mid_pts_line_fit(const Lines &lines_in)
+{
+    vector<Point> mid_points;
+    Vec4f inliers;
+    Lines filt_lines;
+
+    for (auto r : lines_in)
+        mid_points.push_back(r.p_mid);
+
+    fitLine(mid_points, inliers, CV_DIST_L2, 0, 0.001, 0.01);
+
+    
+
+    cout << mid_points << endl;
+    cout << "---------------------" << endl;
+    cout << inliers << endl;
+
+    filt_lines = lines_in;
+    return filt_lines;
 }
