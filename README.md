@@ -11,3 +11,5 @@ sudo apt-get install libomp-dev
 export OMP_NUM_THREADS=1 (for now)
 ```
 
+
+

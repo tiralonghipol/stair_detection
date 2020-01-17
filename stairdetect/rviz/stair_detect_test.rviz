@@ -6,7 +6,6 @@ Panels:
       Expanded:
         - /Image1
         - /Polygon1
-        - /Polygon1/Status1
       Splitter Ratio: 0.5
     Tree Height: 378
   - Class: rviz/Selection
@@ -173,25 +172,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 16.57673454284668
+      Distance: 13.182416915893555
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 9.034093856811523
-        Y: -1.4990935325622559
-        Z: 0.31109678745269775
+        X: 0.023281574249267578
+        Y: -0.827744722366333
+        Z: 0.31109583377838135
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.2597966194152832
+      Pitch: 0.934796929359436
       Target Frame: <Fixed Frame>
       Value: ThirdPersonFollower (rviz)
-      Yaw: 4.585416793823242
+      Yaw: 3.51041579246521
     Saved:
       - Class: rviz/ThirdPersonFollower
         Distance: 3.5
