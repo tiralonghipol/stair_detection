@@ -111,7 +111,11 @@ public:
   Lines filter_lines_by_mid_pts_dist(const Lines &lines_in);
   Lines filter_lines_by_max_width(const Lines &lines_in);
   Lines filter_lines_by_covariance(const Lines &lines_in);
-  Lines filter_lines_by_mid_pts_line_fit(const Lines &lines_in);
+
+  Lines filter_lines_by_gransac(const Lines &lines_in);
+  void DrawFullLine(cv::Mat &img, cv::Point a, cv::Point b, cv::Scalar color, int LineWidth);
+  GRANSAC::VPFloat Slope(int x0, int y0, int x1, int y1);
+
   Eigen::Matrix2d calc_covariance_matrix(const Lines &lines);
   vector<vector<cv::Point>> calc_cluster_bounds(const Lines & lines);
   // Eigen::Vector2d px_to_m(const cv::Point & pt);
@@ -122,7 +126,7 @@ public:
 
   Scalar random_color(RNG &rng);
 
-  cv::Point calc_centroid_pixel(const vector<cv::Point> & hull);
+  cv::Point calc_centroid_pixel(const vector<cv::Point> &hull);
   bool get_bounding_box(const cv::Mat &input_image, const Lines &lines, std::vector<cv::Point> &bounding_box);
 
 private:

@@ -21,6 +21,7 @@ find_package(Boost REQUIRED)
 find_package(PCL REQUIRED)
 find_package(OpenCV 3 REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(OpenMP REQUIRED)
 
 
 # dynamic reconfigure
@@ -61,6 +62,7 @@ include_directories(
   ${PCL_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
   ${Eigen3_INCLUDE_DIRS}
+  ${OpenMP_CXX_LIBRARIES}
 )
 
 ## Declare a C++ library
@@ -82,4 +84,12 @@ target_link_libraries(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}_node
  ${PROJECT_NAME}
+)
+
+# testing
+add_executable(line_fit_example src/line_fit_example.cpp)
+target_link_libraries(line_fit_example
+ ${catkin_LIBRARIES}
+ ${OpenCV_LIBRARIES}
+ ${OpenMP_CXX_LIBRARIES}
 )
