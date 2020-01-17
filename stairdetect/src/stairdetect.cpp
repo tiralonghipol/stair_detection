@@ -405,7 +405,7 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
     else
     {
         if (_param.debug)
-            ROS_WARN("Not enough lines detected");
+            ROS_INFO("Not enough lines detected");
     }
 
     return hulls;

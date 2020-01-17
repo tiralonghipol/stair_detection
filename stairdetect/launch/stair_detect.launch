@@ -17,7 +17,7 @@
         <param name="frame_pcl" value="/velodyne" type="str"/>
 
         <!-- dynamic parameters-->
-        <param name="debug" value="false" type="bool"/>
+        <param name="debug" value="true" type="bool"/>
 
         <!-- line segment detector -->
         <param name="lsd_scale" value=" 0.25" type="double"/>
