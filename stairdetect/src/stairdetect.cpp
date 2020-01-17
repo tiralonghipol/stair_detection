@@ -277,6 +277,7 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
         // additional filtering on lines within clusters
         vector<Lines> processed_clusters;
         process_clustered_lines(subclustered_lines, processed_clusters);
+        // process_clustered_lines(clustered_lines, processed_clusters);
 
         // draw processed clusters on image
         for (int i = 0; i < processed_clusters.size(); i++)
@@ -371,6 +372,8 @@ void stairDetector::process_clustered_lines(
         // Lines filt_lines;
         // filt_lines = filter_lines_by_mid_pts_dist(clustered_lines[i]);
         // filt_lines = filter_lines_by_max_width(filt_lines);
+        filt_lines = filter_lines_by_gransac(clustered_lines[i]);
+        filt_lines = filter_lines_by_mid_pts_dist(filt_lines);
         processed_lines.push_back(filt_lines);
         // Lines dummy = filter_lines_by_covariance(filt_lines);
     }
@@ -494,7 +497,7 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
         std::cout << "---------------------------------"
                   << "\n";
 
-        if (stdev < 13)
+        if (stdev < 20)
         {
             // std::cout << "Potential Stair !" << endl;
             filt_lines = lines;
@@ -924,21 +927,82 @@ void stairDetector::draw_bounding_box(cv::Mat &image, const std::vector<cv::Poin
     cv::rectangle(image, bounding_box[0], bounding_box[1], cv::Scalar(0, 255, 0), 3, 8);
 }
 
-Lines stairDetector::filter_lines_by_mid_pts_line_fit(const Lines &lines_in)
+Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
 {
     vector<Point> mid_points;
     Vec4f inliers;
-    Lines filt_lines;
+    Lines lines_out;
+
+    cv::Mat Canvas(500, 500, CV_8UC3);
+    Canvas.setTo(255);
 
     for (auto r : lines_in)
         mid_points.push_back(r.p_mid);
 
-    fitLine(mid_points, inliers, CV_DIST_L2, 0, 0.001, 0.01);
+    std::vector<std::shared_ptr<GRANSAC::AbstractParameter>> CandPoints;
+    for (int i = 0; i < lines_in.size(); ++i)
+    {
+        Point Pt(lines_in[i].p_mid.x, lines_in[i].p_mid.y);
+        circle(Canvas, Pt, 8, Scalar(0, 255, 0), 2, 8);
 
-    cout << mid_points << endl;
-    cout << "---------------------" << endl;
-    cout << inliers << endl;
+        std::shared_ptr<GRANSAC::AbstractParameter> CandPt = std::make_shared<Point2D>(Pt.x, Pt.y);
+        CandPoints.push_back(CandPt);
+    }
 
-    filt_lines = lines_in;
-    return filt_lines;
+    GRANSAC::RANSAC<Line2DModel, 2> Estimator;
+    Estimator.Initialize(8, 100); // Threshold, iterations
+    int64_t start = cv::getTickCount();
+    Estimator.Estimate(CandPoints);
+    int64_t end = cv::getTickCount();
+    std::cout << "RANSAC took: " << GRANSAC::VPFloat(end - start) / GRANSAC::VPFloat(cv::getTickFrequency()) * 1000.0 << " ms." << std::endl;
+
+    auto BestInliers = Estimator.GetBestInliers();
+    if (BestInliers.size() > 0)
+    {
+        for (auto &Inlier : BestInliers)
+        {
+            auto RPt = std::dynamic_pointer_cast<Point2D>(Inlier);
+            cv::Point2f Pt(RPt->m_Point2D[0], RPt->m_Point2D[1]);
+        }
+        lines_out.clear();
+        for (auto &Inlier : BestInliers)
+        {
+            auto RPt = std::dynamic_pointer_cast<Point2D>(Inlier);
+            // cout << "x =" << RPt->m_Point2D[0]
+            //  << "y =" << RPt->m_Point2D[1] << endl;
+            Point2f Pt(RPt->m_Point2D[0], RPt->m_Point2D[1]);
+            for (auto line : lines_in)
+                if (line.p_mid == Pt)
+                {
+                    lines_out.push_back(line);
+                }
+        }
+    }
+    else
+    {
+        ROS_WARN("Not enough inliers running ransac");
+    }
+
+    cout << "Size Lines IN = " << lines_in.size() << endl;
+    cout << "Size Lines OUT = " << lines_out.size() << endl;
+
+    // lines_out = lines_in;
+    return lines_out;
+}
+
+void stairDetector::DrawFullLine(cv::Mat &img, cv::Point a, cv::Point b, cv::Scalar color, int LineWidth)
+{
+    GRANSAC::VPFloat slope = Slope(a.x, a.y, b.x, b.y);
+
+    cv::Point p(0, 0), q(img.cols, img.rows);
+
+    p.y = -(a.x - p.x) * slope + a.y;
+    q.y = -(b.x - q.x) * slope + b.y;
+
+    cv::line(img, p, q, color, LineWidth, cv::LINE_AA, 0);
+}
+
+GRANSAC::VPFloat stairDetector::Slope(int x0, int y0, int x1, int y1)
+{
+    return (GRANSAC::VPFloat)(y1 - y0) / (x1 - x0);
 }
