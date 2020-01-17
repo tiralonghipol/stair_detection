@@ -44,14 +44,10 @@ using namespace cv::ml;
 struct stairDetectorParams
 {
   bool debug;
-  // canny
-  double canny_low_th = 50;
-  double canny_ratio = 50;
-  int canny_kernel_size = 1;
 
   // morphological filter
-  int morph_kernel_size = 3;
-  int morph_num_iter = 1;
+  int morph_kernel_size = 2;
+  int morph_num_iter = 3;
 
   // line segment detection
   // https://codeutils.xyz/OpenCV3.3.0/dd/d1a/group__imgproc__feature.html#ga6b2ad2353c337c42551b521a73eeae7d
@@ -67,8 +63,8 @@ struct stairDetectorParams
   // THESE SHOULD PROBABLY COME FROM LIDAR_STITCH_PARAMS
   double img_xy_dim = 25;
   double img_resolution = 0.02;
+  
 
-  double max_stair_width = 2.5;
 };
 
 class stairDetector
@@ -86,9 +82,7 @@ public:
   // image operations
   void pcl_to_bird_view_img(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, cv::Mat &img);
   vector<vector<vector<cv::Point>>> filter_img(cv::Mat &img);
-
   void morph_filter(const cv::Mat &img_in, cv::Mat &img_out);
-  void skeleton_filter(const cv::Mat &img_in, cv::Mat &img_out);
   void lsd_lines(const cv::Mat &img_in, Lines &lines);
 
   // visualization
@@ -105,7 +99,6 @@ public:
   vector<Lines> subcluster_by_orientation(const vector<Lines> &clustered_lines);
   vector<Lines> filter_lines_by_angle(const Lines &lines_in);
   Lines filter_lines_by_mid_pts_dist(const Lines &lines_in);
-  Lines filter_lines_by_max_width(const Lines &lines_in);
   Lines filter_lines_by_covariance(const Lines &lines_in);
   Lines filter_lines_by_gransac(const Lines &lines_in);
 
@@ -116,6 +109,7 @@ public:
   void px_to_m_and_publish(vector<vector<vector<cv::Point>>> hulls, vector<cv::Point> hull_centroids_px);
   geometry_msgs::PolygonStamped hull_to_polygon_msg(const vector<tf::Vector3> &hull, int seq_id);
 
+  // clusters colors
   Scalar random_color(RNG &rng);
 
   cv::Point calc_centroid_pixel(const vector<cv::Point> &hull);
@@ -177,6 +171,7 @@ private:
 
   //
   int _max_clusters;
+  int _min_stair_steps = 3;
 
   // color generation
   vector<Scalar> _colorTab;

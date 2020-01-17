@@ -1,5 +1,5 @@
 <launch>
-    <arg name="rviz" default="false" />
+    <arg name="rviz" default="true" />
     <node name="stairdetect" pkg="stairdetect" type="stairdetect_node" clear_params="true" output="screen">
 
         <!-- topic names -->
@@ -17,11 +17,9 @@
         <param name="frame_pcl" value="/velodyne" type="str"/>
 
         <!-- dynamic parameters-->
-        <param name="debug" value="true" type="bool"/>
-        <param name="canny_low_th" value="50" type="double"/>
-        <param name="canny_ratio" value="10" type="double"/>
-        <param name="canny_kernel_size" value="1" type="int"/>
+        <param name="debug" value="false" type="bool"/>
 
+        <!-- line segment detector -->
         <param name="lsd_scale" value=" 0.25" type="double"/>
         <param name="lsd_sigma_scale" value=" 0.25" type="double"/>
         <param name="lsd_quant" value="2.0" type="double"/>
@@ -29,19 +27,25 @@
         <param name="lsd_log_eps" value="0.0" type="double"/>
         <param name="lsd_density_th" value="0.1" type="double"/>
 
+        <!-- morphological filter -->
         <param name="morph_kernel_size" value="2" type="int"/>
-        <param name="morph_num_iter" value="1" type="int"/>
+        <param name="morph_num_iter" value="2" type="int"/>
+
+        <!-- skeleton filter -->
+        <param name="skeleton_kernel_size" value="3" type="int"/>
 
         <!-- timing -->
         <param name="stair_detect_timing" value="5.0" type="double"/>
 
-        <!-- line filtering -->
+        <!-- clustering -->
         <param name="num_line_clusters" value="8" type="int"/>
-        <param name="max_stair_width" value="2.5" type="double"/>
-
+        
+        <!-- stair parameters -->
+        <param name="max_clusters" value="3" type="int"/>
+        
     </node>
 
-    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find stairdetect)/rviz/stair_detect_test.rviz" />
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find stairdetect)/rviz/stair_detect_test.rviz" if="$(arg rviz)"/>
 
 </launch>
 
