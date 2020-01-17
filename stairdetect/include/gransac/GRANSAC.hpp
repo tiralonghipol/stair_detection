@@ -70,7 +70,7 @@ public:
 	{
 		if (Data.size() <= t_NumParams)
 		{
-			std::cerr << "[ WARN ]: RANSAC - Number of data points is too less. Not doing anything." << std::endl;
+			// std::cerr << "[ WARN ]: RANSAC - Number of data points is too less. Not doing anything." << std::endl;
 			return false;
 		}
 

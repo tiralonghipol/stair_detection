@@ -23,6 +23,7 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     // other params
     n.getParam("stair_detect_timing", _stair_detect_time);
     n.getParam("num_line_clusters", _max_clusters);
+    n.getParam("min_stair_steps", _min_stair_steps);
     _pose_Q_size = 40;
 
     // test flag
@@ -38,7 +39,8 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
 
     while (sharedPtr == NULL)
     {
-        ROS_INFO("Stitched PCL not received yet");
+        if (_param.debug)
+            ROS_INFO("Stitched PCL not received yet");
         sharedPtr = ros::topic::waitForMessage<sensor_msgs::PointCloud2>(_topic_stitched_pcl, ros::Duration(2));
     }
 
@@ -95,7 +97,8 @@ void stairDetector::callback_stitched_pcl(
     }
     else
     {
-        ROS_INFO("Message is empty");
+        if (_param.debug)
+            ROS_INFO("Received pose message is empty");
     }
     return;
 }
@@ -119,7 +122,9 @@ void stairDetector::callback_timer_trigger(
 
     if (!_recent_cloud->empty())
     {
-        ROS_INFO("IN CALLBACK_TIMER_TRIGGER");
+        if (_param.debug)
+            ROS_INFO("In callback timer trigger");
+        // _callback_tf = _recent_tf;
         _callback_pose = _recent_pose;
 
         // convert most recently-received pointcloud to birds-eye-view image
@@ -153,12 +158,13 @@ void stairDetector::callback_timer_trigger(
     }
     else
     {
-        ROS_INFO("No stitch in progress");
+        if (_param.debug)
+            ROS_INFO("No stitch in progress");
     }
 
     std::clock_t t_1 = std::clock();
 
-    if( true )
+    if (true)
     {
         double cps = CLOCKS_PER_SEC;
         std::cout << "\nTIMINGS:" << std::endl;
@@ -172,7 +178,7 @@ void stairDetector::callback_timer_trigger(
 }
 
 bool stairDetector::check_hull_area(
-    const double & hull_area)
+    const double &hull_area)
 {
     // convert area in pixels^2 to m^2
     double area = hull_area * _param.img_resolution * _param.img_resolution;
@@ -195,6 +201,8 @@ void stairDetector::px_to_m_and_publish(
             hulls_rf[i].push_back(tf::Vector3(xy[0], xy[1], _callback_pose.pose.pose.position.z));
         }
     }
+    if (_param.debug)
+        ROS_INFO("Convex Hull in World frame... Done!");
 
     // publish the hulls as rviz polygons
     int j = 0;
@@ -275,7 +283,8 @@ void stairDetector::pcl_to_bird_view_img(
 
 void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, uint32_t level)
 {
-    ROS_INFO("Reconfigure Triggered");
+    if (_param.debug)
+        ROS_INFO("Dynamic reconfigure triggered");
     // high level bools
     _param.debug = config.debug;
 
@@ -290,8 +299,6 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
     _param.lsd_angle_th = config.lsd_angle_th;
     _param.lsd_log_eps = config.lsd_log_eps;
     _param.lsd_density_th = config.lsd_density_th;
-
-    _param.max_stair_width = config.max_stair_width;
 
     // area constraints
     _param.staircase_max_area = config.staircase_max_area;
@@ -325,20 +332,23 @@ void stairDetector::setParam(const stairDetectorParams &param)
 
 vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
 {
+    if (_param.debug)
+        ROS_INFO("In filter img");
+
     // calculates convex hulls for potential staircases
     vector<vector<vector<cv::Point>>> hulls;
 
-    // Mat proc_img, line_img, filtered_line_img;
     Mat line_img, filtered_line_img;
-
     Mat proc_img = raw_img.clone();
+
+    Mat morph_img(raw_img.size(), CV_8UC1);
     morph_filter(raw_img, proc_img);
 
     // line detection
     Lines lines;
     lsd_lines(proc_img, lines);
 
-    if (lines.size() > 3)
+    if (lines.size() > _min_stair_steps)
     {
         // plot lines on image
         cvtColor(proc_img, line_img, CV_GRAY2BGR);
@@ -370,10 +380,10 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
         {
             vector<vector<cv::Point>> hull = calc_cluster_bounds(processed_clusters[i]);
 
-            if( hull[0].size() > 2 )
+            if (hull[0].size() > 2)
             {
                 // only keep hulls meeting area constraints
-                if( check_hull_area(contourArea(hull[0], false)) )
+                if (check_hull_area(contourArea(hull[0], false)))
                 {
                     hulls.push_back(hull);
                 }
@@ -394,7 +404,8 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
     }
     else
     {
-        ROS_WARN("Not enough lines detected");
+        if (_param.debug)
+            ROS_WARN("Not enough lines detected");
     }
 
     return hulls;
@@ -454,7 +465,7 @@ void stairDetector::process_clustered_lines(
     {
         // remove lines in each cluster which do not meet geometric constraints
         Lines filt_lines;
-        // filt_lines = filter_lines_by_max_width(filt_lines);
+        // filt_lines = filter_lines_by_mid_pts_dist(clustered_lines[i]);
         filt_lines = filter_lines_by_gransac(clustered_lines[i]);
         filt_lines = filter_lines_by_mid_pts_dist(filt_lines);
         processed_lines.push_back(filt_lines);
@@ -469,7 +480,7 @@ Lines stairDetector::filter_lines_by_covariance(
     Lines filt_lines;
 
     // get covariance matrix for each cluster
-    if (lines.size() > 3)
+    if (lines.size() > _min_stair_steps)
     {
         Eigen::Matrix2d sigma = calc_covariance_matrix(lines);
 
@@ -477,21 +488,6 @@ Lines stairDetector::filter_lines_by_covariance(
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(sigma);
         Eigen::Vector2d e_vals = eigensolver.eigenvalues();
     }
-    return filt_lines;
-}
-
-Lines stairDetector::filter_lines_by_max_width(
-    const Lines &lines)
-{
-    Lines filt_lines = lines;
-
-    for (int i = 0; i < lines.size(); i++)
-    {
-        ROS_WARN("filt_lines[%d].lenght = %f", i, lines[i].length);
-        if (filt_lines[i].length * _param.img_resolution > _param.max_stair_width)
-            filt_lines.erase(filt_lines.begin() + i);
-    }
-
     return filt_lines;
 }
 
@@ -503,7 +499,7 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
     double dx, dy, mag;
     vector<double> min_dists;
 
-    if (lines.size() > 3)
+    if (lines.size() > _min_stair_steps)
     {
         for (int i = 0; i < lines.size() - 1; i++)
         {
@@ -551,13 +547,14 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
 
         double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
         double stdev = std::sqrt(sq_sum / min_dists.size());
-        cout << "Mean = " << mean << endl;
-        cout << "Variance = " << stdev << endl;
-        std::cout << "---------------------------------"
-                  << "\n";
+
+        if (_param.debug)
+            ROS_INFO("Mean = %f | Variance = %f", mean, stdev);
 
         if (stdev < 20)
         {
+            if (_param.debug)
+                ROS_INFO("Potential stair!");
             filt_lines = lines;
         }
         else
@@ -706,35 +703,6 @@ void stairDetector::morph_filter(const cv::Mat &img_in, cv::Mat &img_out)
     return;
 }
 
-void stairDetector::skeleton_filter(
-    const cv::Mat &img_in,
-    cv::Mat &img_out)
-{
-    // http://felix.abecassis.me/2011/09/opencv-morphological-skeleton/
-    Mat img;
-    img_in.copyTo(img);
-
-    cv::threshold(img, img, 0, 255, THRESH_BINARY);
-    Mat temp;
-    Mat eroded;
-
-    Mat element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
-
-    bool done = false;
-    do
-    {
-        erode(img, eroded, element);
-        dilate(eroded, temp, element);
-        subtract(img, temp, temp);
-        bitwise_or(img_out, temp, img_out);
-        eroded.copyTo(img);
-
-        done = (countNonZero(img) == 0);
-    } while (!done);
-
-    return;
-}
-
 void stairDetector::draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color)
 {
     for (int i = 0; i < lines.size(); i++)
@@ -777,7 +745,8 @@ void stairDetector::lsd_lines(const cv::Mat &img_in, Lines &lines)
         line.calPixels(img_in);
         lines.push_back(line);
     }
-    ROS_INFO_ONCE("Found %d lines", lines.size());
+    if (_param.debug)
+        ROS_INFO_ONCE("Found %d lines", lines.size());
     return;
 }
 
@@ -813,8 +782,6 @@ void stairDetector::cluster_by_kmeans(
         else
             slopes.at<float>(i, 2) = lines[i].k;
     }
-
-    // std::cout << slopes << std::endl;
 
     if (points.rows >= _max_clusters)
     {
@@ -876,7 +843,6 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
     Vec4f inliers;
     Lines lines_out;
 
-
     for (auto r : lines_in)
         mid_points.push_back(r.p_mid);
 
@@ -890,12 +856,12 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
     }
 
     GRANSAC::RANSAC<Line2DModel, 2> Estimator;
-    Estimator.Initialize(8, 100); // Threshold, iterations
-    int64_t start = cv::getTickCount();
+    Estimator.Initialize(10, 100); // Threshold, iterations
+    // int64_t start = cv::getTickCount();
     Estimator.Estimate(CandPoints);
-    int64_t end = cv::getTickCount();
-   
-    std::cout << "RANSAC took: " << GRANSAC::VPFloat(end - start) / GRANSAC::VPFloat(cv::getTickFrequency()) * 1000.0 << " ms." << std::endl;
+    // int64_t end = cv::getTickCount();
+
+    // std::cout << "RANSAC took: " << GRANSAC::VPFloat(end - start) / GRANSAC::VPFloat(cv::getTickFrequency()) * 1000.0 << " ms." << std::endl;
 
     auto BestInliers = Estimator.GetBestInliers();
     if (BestInliers.size() > 0)
@@ -909,7 +875,7 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
         for (auto &Inlier : BestInliers)
         {
             auto RPt = std::dynamic_pointer_cast<Point2D>(Inlier);
-            
+
             Point2f Pt(RPt->m_Point2D[0], RPt->m_Point2D[1]);
             for (auto line : lines_in)
                 if (line.p_mid == Pt)

@@ -3,7 +3,9 @@ Panels:
     Help Height: 0
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
+      Expanded:
+        - /Global Options1
+        - /PointCloud21
       Splitter Ratio: 0.5
     Tree Height: 269
   - Class: rviz/Selection
@@ -119,7 +121,7 @@ Visualization Manager:
       Unreliable: false
       Value: true
     - Class: rviz/Image
-      Enabled: true
+      Enabled: false
       Image Topic: /stairdetect/filtered_line_img
       Max Value: 1
       Median window: 5
@@ -129,7 +131,7 @@ Visualization Manager:
       Queue Size: 100
       Transport Hint: raw
       Unreliable: false
-      Value: true
+      Value: false
     - Alpha: 1
       Class: rviz/Polygon
       Color: 25; 255; 0
