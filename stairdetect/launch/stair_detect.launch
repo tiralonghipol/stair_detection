@@ -10,6 +10,11 @@
         <param name="topic_proc_img" value="proc_img" type="str"/>
         <param name="topic_line_img" value="line_img" type="str"/>
         <param name="topic_filtered_line_img" value="filtered_line_img" type="str"/>
+        <param name="topic_staircase_polygon" value="staircase_bound" type="str"/>
+
+        <!-- frames -->
+        <param name="frame_world" value="/world" type="str"/>
+        <param name="frame_pcl" value="/velodyne" type="str"/>
 
         <!-- dynamic parameters-->
         <param name="debug" value="true" type="bool"/>
@@ -37,7 +42,7 @@
 
     </node>
 
-    <!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find stairdetect)/rviz/stair_detect_test.rviz" /> -->
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find stairdetect)/rviz/stair_detect_test.rviz" />
 
 </launch>
 

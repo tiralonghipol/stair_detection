@@ -14,10 +14,15 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     n.getParam("topic_proc_img", _topic_proc_img);
     n.getParam("topic_line_img", _topic_line_img);
     n.getParam("topic_filtered_line_img", _topic_filtered_line_img);
-    n.getParam("stair_detect_timing", _stair_detect_time);
-    n.getParam("num_line_clusters", _max_clusters);
+    n.getParam("topic_staircase_polygon", _topic_polygon);
+
+    // frames
+    n.getParam("frame_world", _frame_world);
+    n.getParam("frame_pcl", _frame_pcl);
 
     // other params
+    n.getParam("stair_detect_timing", _stair_detect_time);
+    n.getParam("num_line_clusters", _max_clusters);
     _pose_Q_size = 40;
 
     // test flag
@@ -43,15 +48,18 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
 
     // publishers
     _pub_trimmed_pcl = n.advertise<sensor_msgs::PointCloud2>(_topic_trimmed_pcl, bufSize);
+    // _pub_staircase_polygon = n.advertise<geometry_msgs::PolygonStamped>(_topic_polygon, bufSize);
+    _pub_staircase_polygon = n.advertise<geometry_msgs::PolygonStamped>(_topic_polygon, 10);
+
     image_transport::ImageTransport it_0(n);
     _pub_bird_view_img = it_0.advertise(_topic_bird_eye_img, 1);
     image_transport::ImageTransport it_1(n);
     _pub_proc_img = it_1.advertise(_topic_proc_img, 1);
     image_transport::ImageTransport it_2(n);
     _pub_line_img = it_2.advertise(_topic_line_img, 1);
+    // show final result of filtering on this topic
     image_transport::ImageTransport it_3(n);
     _pub_filtered_line_img = it_3.advertise(_topic_filtered_line_img, 1);
-    // show final result of filtering on this topic
 
     // timers
     _timer_stair_detect = n.createTimer(
@@ -72,7 +80,17 @@ void stairDetector::callback_stitched_pcl(
 {
     if (!msg->empty())
     {
+        // std::cout << msg->header.frame_id << std::endl;
         _recent_pose = _pose_Q[0];
+        try
+        {
+            _tf_listener.waitForTransform(_frame_world, _frame_pcl, ros::Time(0), ros::Duration(0,2));
+            _tf_listener.lookupTransform(_frame_world, _frame_pcl, ros::Time(0), _recent_tf);
+        }
+        catch (tf::TransformException ex)
+        {
+            ROS_ERROR("Error finding transform %s", ex.what());
+        }
         _recent_cloud = msg;
     }
     else
@@ -93,6 +111,9 @@ void stairDetector::callback_timer_trigger(
 
     if (!_recent_cloud->empty())
     {
+        _callback_tf = _recent_tf;
+        _callback_pose = _recent_pose;
+
         // convert most recently-received pointcloud to birds-eye-view image
         pcl_to_bird_view_img(_recent_cloud, img);
 
@@ -112,8 +133,7 @@ void stairDetector::callback_timer_trigger(
             }
         }
 
-        // convert pixel coordinates to world coordinates
-        // TODO
+        px_to_m_and_publish(hulls, hull_centroids_px);
 
         // check recent potential staircases against previously-found staircases
         // TODO
@@ -122,20 +142,116 @@ void stairDetector::callback_timer_trigger(
     {
         ROS_INFO("No stitch in progress");
     }
+    return;
+}
+
+void stairDetector::px_to_m_and_publish(
+    vector<vector<vector<cv::Point>>> hulls,
+    vector<cv::Point> hull_centroids_px)
+{
+    vector<vector<tf::Vector3>> hulls_rf(hulls.size());
+    vector<vector<tf::Vector3>> hulls_wf(hulls.size());
+
+    Eigen::Vector2d xy;
+    for( int i = 0; i < hulls.size(); i++ )
+    {
+        for( int j = 0; j < hulls[i][0].size(); j++ )
+        {
+            xy = px_to_m(hulls[i][0][j]);
+            hulls_rf[i].push_back(tf::Vector3(xy[0], xy[1], _callback_pose.pose.pose.position.z));
+        }
+
+        // for( int j = 0; j < hulls_rf[i].size(); j++ )
+        // {
+            // hulls_wf[i].push_back(_callback_tf * hulls_rf[i][j]);
+            // hulls_wf[i].push_back(_callback_tf.inverse() * hulls_rf[i][j]);
+        // }
+    }
+    std::cout << "\nDONE BUILDING HULLS IN WORLD FRAME" << std::endl;
+    // std::cout << hulls_wf.size() << std::endl;
+
+    // publish the hulls as rviz polygons
+    int j = 0;
+    while( j < hulls_rf.size() )
+    {
+        if( hulls_rf[j].size() > 0 )
+        {
+            std::cout << j << std::endl;
+            geometry_msgs::PolygonStamped msg;
+            msg = hull_to_polygon_msg(hulls_rf[j]);
+            // msg = hull_to_polygon_msg(hulls_wf[j]);
+            _pub_staircase_polygon.publish(msg);
+            j++;
+        }
+    }
 
     return;
 }
 
-vector<double> stairDetector::px_to_m(
-    const cv::Point &pt_px)
+geometry_msgs::PolygonStamped stairDetector::hull_to_polygon_msg( 
+    const vector<tf::Vector3> & hull )
 {
-    vector<double> xy;
+    geometry_msgs::PolygonStamped msg;
+    msg.header.stamp = ros::Time(0);
+    msg.header.frame_id = _frame_world;
 
+    for( int i = 0; i < hull.size(); i++ )
+    {
+        geometry_msgs::Point32 pt;
+        pt.x = hull[i][0];
+        pt.y = hull[i][1];
+        pt.z = hull[i][2];
+        msg.polygon.points.push_back(pt);
+    }
+
+    return msg;
+}
+
+Eigen::Vector2d stairDetector::px_to_m(
+    const cv::Point & pt)
+{
+    Eigen::Vector2d xy;
+    int img_midpt = int(_param.img_xy_dim / _param.img_resolution) / 2;
+    xy[0] = _callback_pose.pose.pose.position.x
+        - (float(pt.y - img_midpt)) * _param.img_resolution;
+    xy[1] = + _callback_pose.pose.pose.position.y
+        - (float(pt.x - img_midpt)) * _param.img_resolution;
+    return xy;
+}
+
+void stairDetector::pcl_to_bird_view_img(
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+    cv::Mat &img)
+{
     int img_midpt = int(_param.img_xy_dim / _param.img_resolution) / 2;
 
-    // TODO  // TODO //
+    // get current xy
+    double x_0 = _callback_pose.pose.pose.position.x;
+    double y_0 = _callback_pose.pose.pose.position.y;
 
-    return xy;
+    // build birds-eye-view image
+    int idx_x = 0;
+    int idx_y = 0;
+    for (const pcl::PointXYZ pt : cloud->points)
+    {
+        /*
+        NOTE:
+        these image coordinates may be reversed. may need to switch in order
+        to correctly extract real-world coordinates from pixel coordinates
+        */
+        idx_x = int((x_0 - pt.x) / _param.img_resolution) + img_midpt;
+        idx_y = int((y_0 - pt.y) / _param.img_resolution) + img_midpt;
+
+        /* 
+        must check that pixel index lies with image, as robot may have moved since
+        the stitched pointcloud was constructed
+        */
+        if (!(idx_x >= img.size().width || idx_y >= img.size().height) && !(idx_x < 0 || idx_y < 0))
+        {
+            img.at<uchar>(idx_x, idx_y) = 255;
+        }
+    }
+    return;
 }
 
 void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, uint32_t level)
@@ -161,41 +277,6 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
 
     _param.max_stair_width = config.max_stair_width;
     setParam(_param);
-    return;
-}
-
-void stairDetector::pcl_to_bird_view_img(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
-    cv::Mat &img)
-{
-    int img_midpt = int(_param.img_xy_dim / _param.img_resolution) / 2;
-
-    // get current xy
-    double x_0 = _recent_pose.pose.pose.position.x;
-    double y_0 = _recent_pose.pose.pose.position.y;
-
-    // build birds-eye-view image
-    int idx_x = 0;
-    int idx_y = 0;
-    for (const pcl::PointXYZ pt : cloud->points)
-    {
-        /*
-        NOTE:
-        these image coordinates may be reversed. may need to switch in order
-        to correctly extract real-world coordinates from pixel coordinates
-        */
-        idx_x = int((x_0 - pt.x) / _param.img_resolution) + img_midpt;
-        idx_y = int((y_0 - pt.y) / _param.img_resolution) + img_midpt;
-
-        /* 
-        must check that pixel index lies with image, as robot may have moved since
-        the stitched pointcloud was constructed
-        */
-        if (!(idx_x >= img.size().width || idx_y >= img.size().height) && !(idx_x < 0 || idx_y < 0))
-        {
-            img.at<uchar>(idx_x, idx_y) = 255;
-        }
-    }
     return;
 }
 
@@ -372,7 +453,6 @@ void stairDetector::process_clustered_lines(
         // filt_lines = filter_lines_by_mid_pts_dist(clustered_lines[i]);
         // filt_lines = filter_lines_by_max_width(filt_lines);
         processed_lines.push_back(filt_lines);
-        // Lines dummy = filter_lines_by_covariance(filt_lines);
     }
 
     return;

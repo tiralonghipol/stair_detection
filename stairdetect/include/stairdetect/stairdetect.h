@@ -21,6 +21,7 @@
 // #include <Eigen/Dense>
 #include "Eigen/Geometry"
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <geometry_msgs/PolygonStamped.h>
 
 // opencv stuff
 #include <opencv2/core.hpp>
@@ -31,10 +32,10 @@
 
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
+#include <tf/transform_listener.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <stairdetect/StairDetectConfig.h>
-
 
 using namespace std;
 using namespace cv;
@@ -113,7 +114,11 @@ public:
   Lines filter_lines_by_mid_pts_line_fit(const Lines &lines_in);
   Eigen::Matrix2d calc_covariance_matrix(const Lines &lines);
   vector<vector<cv::Point>> calc_cluster_bounds(const Lines & lines);
-  vector<double> px_to_m(const cv::Point & pt);
+  // Eigen::Vector2d px_to_m(const cv::Point & pt);
+  Eigen::Vector2d px_to_m(const cv::Point & pt);
+  void px_to_m_and_publish(
+    vector<vector<vector<cv::Point>>> hulls, vector<cv::Point> hull_centroids_px);
+  geometry_msgs::PolygonStamped hull_to_polygon_msg(const vector<tf::Vector3> & hull);
 
   Scalar random_color(RNG &rng);
 
@@ -125,13 +130,18 @@ private:
   ros::Subscriber _sub_stitched_pcl;
   ros::Subscriber _sub_pose;
 
+  // keep track of transform when stitched cloud is received
+  tf::TransformListener _tf_listener;
+
   // publishers
   ros::Publisher _pub_trimmed_pcl;
+  ros::Publisher _pub_staircase_polygon;
   image_transport::Publisher _pub_bird_view_img;
   image_transport::Publisher _pub_proc_img;
   image_transport::Publisher _pub_morph_img;
   image_transport::Publisher _pub_line_img;
   image_transport::Publisher _pub_filtered_line_img;
+
 
   // timers
   ros::Timer _timer_stair_detect;
@@ -144,6 +154,11 @@ private:
   std::string _topic_proc_img;
   std::string _topic_line_img;
   std::string _topic_filtered_line_img;
+  std::string _topic_polygon;
+
+  // frame names
+  std::string _frame_world;
+  std::string _frame_pcl;
 
   // pointcloud trimming params
   double _stair_detect_time;
@@ -151,6 +166,10 @@ private:
   // reference to most recently-received cloud
   pcl::PointCloud<pcl::PointXYZ>::Ptr _recent_cloud;
   geometry_msgs::PoseWithCovarianceStamped _recent_pose;
+  tf::StampedTransform _recent_tf;
+  geometry_msgs::PoseWithCovarianceStamped _callback_pose;
+  tf::StampedTransform _callback_tf;
+
 
   // parameter container
   stairDetectorParams _param;
