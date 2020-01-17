@@ -103,6 +103,14 @@ void stairDetector::callback_stitched_pcl(
 void stairDetector::callback_timer_trigger(
     const ros::TimerEvent &event)
 {
+    std::clock_t t_be_0;
+    std::clock_t t_be_1;
+    std::clock_t t_filt_0;
+    std::clock_t t_filt_1;
+    std::clock_t t_pub_0;
+    std::clock_t t_pub_1;
+    std::clock_t t_0 = std::clock();
+
     Mat img(
         int(_param.img_xy_dim / _param.img_resolution),
         int(_param.img_xy_dim / _param.img_resolution),
@@ -112,27 +120,31 @@ void stairDetector::callback_timer_trigger(
     if (!_recent_cloud->empty())
     {
         ROS_INFO("IN CALLBACK_TIMER_TRIGGER");
-        // _callback_tf = _recent_tf;
         _callback_pose = _recent_pose;
 
         // convert most recently-received pointcloud to birds-eye-view image
+        t_be_0 = std::clock();
         pcl_to_bird_view_img(_recent_cloud, img);
+        t_be_1 = std::clock();
 
         // find convex hulls around line clusters
         vector<vector<vector<cv::Point>>> hulls;
+        t_filt_0 = std::clock();
         hulls = filter_img(img);
+        t_filt_1 = std::clock();
 
         // find areas, centroids of potential staircases (in pixels)
+        t_pub_0 = std::clock();
         vector<double> hull_areas_px;
         vector<cv::Point> hull_centroids_px;
         for (int i = 0; i < hulls.size(); i++)
         {
-            if (hulls[i][0].size() > 2)
-            {
-                hull_centroids_px.push_back(calc_centroid_pixel(hulls[i][0]));
-                hull_areas_px.push_back(contourArea(hulls[i][0], false));
-            }
+            cv::Point centroid = calc_centroid_pixel(hulls[i][0]);
+            double hull_area = contourArea(hulls[i][0], false);
+            hull_centroids_px.push_back(centroid);
+            hull_areas_px.push_back(hull_area);
         }
+        t_pub_1 = std::clock();
 
         px_to_m_and_publish(hulls, hull_centroids_px);
 
@@ -143,7 +155,28 @@ void stairDetector::callback_timer_trigger(
     {
         ROS_INFO("No stitch in progress");
     }
+
+    std::clock_t t_1 = std::clock();
+
+    if( true )
+    {
+        double cps = CLOCKS_PER_SEC;
+        std::cout << "\nTIMINGS:" << std::endl;
+        std::cout << "total time:\t" << (t_1 - t_0) / cps << std::endl;
+        std::cout << "pcl->img time:\t" << (t_be_1 - t_be_0) / cps << std::endl;
+        std::cout << "img filt time:\t" << (t_filt_1 - t_filt_0) / cps << std::endl;
+        std::cout << "pub time:\t" << (t_pub_1 - t_pub_0) / cps << std::endl;
+    }
+
     return;
+}
+
+bool stairDetector::check_hull_area(
+    const double & hull_area)
+{
+    // convert area in pixels^2 to m^2
+    double area = hull_area * _param.img_resolution * _param.img_resolution;
+    return area < _param.staircase_max_area && area > _param.staircase_min_area;
 }
 
 void stairDetector::px_to_m_and_publish(
@@ -162,7 +195,6 @@ void stairDetector::px_to_m_and_publish(
             hulls_rf[i].push_back(tf::Vector3(xy[0], xy[1], _callback_pose.pose.pose.position.z));
         }
     }
-    std::cout << "\nDONE BUILDING HULLS IN WORLD FRAME" << std::endl;
 
     // publish the hulls as rviz polygons
     int j = 0;
@@ -226,11 +258,6 @@ void stairDetector::pcl_to_bird_view_img(
     int idx_y = 0;
     for (const pcl::PointXYZ pt : cloud->points)
     {
-        /*
-        NOTE:
-        these image coordinates may be reversed. may need to switch in order
-        to correctly extract real-world coordinates from pixel coordinates
-        */
         idx_x = int((x_0 - pt.x) / _param.img_resolution) + img_midpt;
         idx_y = int((y_0 - pt.y) / _param.img_resolution) + img_midpt;
 
@@ -265,6 +292,11 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
     _param.lsd_density_th = config.lsd_density_th;
 
     _param.max_stair_width = config.max_stair_width;
+
+    // area constraints
+    _param.staircase_max_area = config.staircase_max_area;
+    _param.staircase_min_area = config.staircase_min_area;
+
     setParam(_param);
     return;
 }
@@ -288,13 +320,11 @@ void stairDetector::callback_pose(
 void stairDetector::setParam(const stairDetectorParams &param)
 {
     _param = param;
-
     return;
 }
 
 vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
 {
-    ROS_INFO("IN FILTER_IMG");
     // calculates convex hulls for potential staircases
     vector<vector<vector<cv::Point>>> hulls;
 
@@ -302,17 +332,7 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
     Mat line_img, filtered_line_img;
 
     Mat proc_img = raw_img.clone();
-    // edge detection
-
-    // Mat morph_img(raw_img.size(), CV_8UC1);
-    // morph_filter(raw_img, morph_img);
-    // Mat t_img;
-    // threshold(morph_img, t_img, 0, 255, THRESH_BINARY);
-    // skeleton_filter(morph_img, proc_img);
-    // ---------------------------------------- //
     morph_filter(raw_img, proc_img);
-
-    // medianBlur(edge_img, edge_img, 3);
 
     // line detection
     Lines lines;
@@ -343,21 +363,27 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
         {
             draw_lines(filtered_line_img, processed_clusters[i], Scalar(0, 0, 255));
         }
+        draw_clustered_lines(filtered_line_img, processed_clusters);
 
         // find convex hulls around line clusters
         for (int i = 0; i < processed_clusters.size(); i++)
         {
-            hulls.push_back(calc_cluster_bounds(processed_clusters[i]));
+            vector<vector<cv::Point>> hull = calc_cluster_bounds(processed_clusters[i]);
+
+            if( hull[0].size() > 2 )
+            {
+                // only keep hulls meeting area constraints
+                if( check_hull_area(contourArea(hull[0], false)) )
+                {
+                    hulls.push_back(hull);
+                }
+            }
         }
-        draw_clustered_lines(filtered_line_img, processed_clusters);
 
         // draw convex hulls on the image
-        for (int i = 0; i < processed_clusters.size(); i++)
+        for (int i = 0; i < hulls.size(); i++)
         {
-            if (processed_clusters[i].size() > 0)
-            {
-                drawContours(filtered_line_img, hulls[i], -1, Scalar(0, 255, 0), 2);
-            }
+            drawContours(filtered_line_img, hulls[i], -1, Scalar(0, 255, 0), 2);
         }
 
         // publish images
@@ -427,9 +453,7 @@ void stairDetector::process_clustered_lines(
     for (int i = 0; i < clustered_lines.size(); i++)
     {
         // remove lines in each cluster which do not meet geometric constraints
-        // Lines filt_lines = clustered_lines[i];
         Lines filt_lines;
-        // filt_lines = filter_lines_by_mid_pts_dist(clustered_lines[i]);
         // filt_lines = filter_lines_by_max_width(filt_lines);
         filt_lines = filter_lines_by_gransac(clustered_lines[i]);
         filt_lines = filter_lines_by_mid_pts_dist(filt_lines);
@@ -506,9 +530,6 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
 
             for (int j = 0; j < distances.cols; j++)
             {
-                // if (i == j)
-                //     continue;
-                //  check for minimum  in each row of the matrix
                 if (distances.at<float>(i, j) < minm && distances.at<float>(i, j) > 0)
                     minm = distances.at<float>(i, j);
             }
@@ -537,7 +558,6 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
 
         if (stdev < 20)
         {
-            // std::cout << "Potential Stair !" << endl;
             filt_lines = lines;
         }
         else
@@ -781,9 +801,7 @@ void stairDetector::cluster_by_kmeans(
     for (i = 0; i < lines.size(); i++)
     {
         points.push_back(lines[i].p_mid);
-        // slopes.push_back(lines[i].k);
     }
-    // Mat slopes;
 
     // Method 2) use both x,y and slope
     for (i = 0; i < lines.size(); i++)
@@ -877,7 +895,7 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
     Estimator.Estimate(CandPoints);
     int64_t end = cv::getTickCount();
    
-    // std::cout << "RANSAC took: " << GRANSAC::VPFloat(end - start) / GRANSAC::VPFloat(cv::getTickFrequency()) * 1000.0 << " ms." << std::endl;
+    std::cout << "RANSAC took: " << GRANSAC::VPFloat(end - start) / GRANSAC::VPFloat(cv::getTickFrequency()) * 1000.0 << " ms." << std::endl;
 
     auto BestInliers = Estimator.GetBestInliers();
     if (BestInliers.size() > 0)

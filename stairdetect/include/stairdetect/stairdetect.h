@@ -68,6 +68,9 @@ struct stairDetectorParams
   double img_xy_dim = 25;
   double img_resolution = 0.02;
 
+  double staircase_max_area = 10.0;
+  double staircase_min_area = 1.5;
+
   double max_stair_width = 2.5;
 };
 
@@ -116,6 +119,8 @@ public:
   void px_to_m_and_publish(vector<vector<vector<cv::Point>>> hulls, vector<cv::Point> hull_centroids_px);
   geometry_msgs::PolygonStamped hull_to_polygon_msg(const vector<tf::Vector3> &hull, int seq_id);
 
+  bool check_hull_area(const double & hull_area);
+
   Scalar random_color(RNG &rng);
 
   cv::Point calc_centroid_pixel(const vector<cv::Point> &hull);
@@ -162,7 +167,6 @@ private:
   geometry_msgs::PoseWithCovarianceStamped _recent_pose;
   tf::StampedTransform _recent_tf;
   geometry_msgs::PoseWithCovarianceStamped _callback_pose;
-  tf::StampedTransform _callback_tf;
 
   // parameter container
   stairDetectorParams _param;
