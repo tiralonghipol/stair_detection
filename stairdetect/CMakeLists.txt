@@ -85,11 +85,3 @@ target_link_libraries(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}_node
  ${PROJECT_NAME}
 )
-
-# testing
-add_executable(line_fit_example src/line_fit_example.cpp)
-target_link_libraries(line_fit_example
- ${catkin_LIBRARIES}
- ${OpenCV_LIBRARIES}
- ${OpenMP_CXX_LIBRARIES}
-)

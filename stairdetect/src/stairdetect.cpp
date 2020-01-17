@@ -82,15 +82,15 @@ void stairDetector::callback_stitched_pcl(
     {
         // std::cout << msg->header.frame_id << std::endl;
         _recent_pose = _pose_Q[0];
-        try
-        {
-            _tf_listener.waitForTransform(_frame_world, _frame_pcl, ros::Time(0), ros::Duration(0,2));
-            _tf_listener.lookupTransform(_frame_world, _frame_pcl, ros::Time(0), _recent_tf);
-        }
-        catch (tf::TransformException ex)
-        {
-            ROS_ERROR("Error finding transform %s", ex.what());
-        }
+        // try
+        // {
+        //     _tf_listener.waitForTransform(_frame_world, _frame_pcl, ros::Time(0), ros::Duration(0,2));
+        //     _tf_listener.lookupTransform(_frame_world, _frame_pcl, ros::Time(0), _recent_tf);
+        // }
+        // catch (tf::TransformException ex)
+        // {
+        //     ROS_ERROR("Error finding transform %s", ex.what());
+        // }
         _recent_cloud = msg;
     }
     else
@@ -111,7 +111,8 @@ void stairDetector::callback_timer_trigger(
 
     if (!_recent_cloud->empty())
     {
-        _callback_tf = _recent_tf;
+        ROS_INFO("IN CALLBACK_TIMER_TRIGGER");
+        // _callback_tf = _recent_tf;
         _callback_pose = _recent_pose;
 
         // convert most recently-received pointcloud to birds-eye-view image
@@ -160,15 +161,8 @@ void stairDetector::px_to_m_and_publish(
             xy = px_to_m(hulls[i][0][j]);
             hulls_rf[i].push_back(tf::Vector3(xy[0], xy[1], _callback_pose.pose.pose.position.z));
         }
-
-        // for( int j = 0; j < hulls_rf[i].size(); j++ )
-        // {
-            // hulls_wf[i].push_back(_callback_tf * hulls_rf[i][j]);
-            // hulls_wf[i].push_back(_callback_tf.inverse() * hulls_rf[i][j]);
-        // }
     }
     std::cout << "\nDONE BUILDING HULLS IN WORLD FRAME" << std::endl;
-    // std::cout << hulls_wf.size() << std::endl;
 
     // publish the hulls as rviz polygons
     int j = 0;
@@ -176,24 +170,24 @@ void stairDetector::px_to_m_and_publish(
     {
         if( hulls_rf[j].size() > 0 )
         {
-            std::cout << j << std::endl;
             geometry_msgs::PolygonStamped msg;
-            msg = hull_to_polygon_msg(hulls_rf[j]);
-            // msg = hull_to_polygon_msg(hulls_wf[j]);
+            msg = hull_to_polygon_msg(hulls_rf[j], j);
             _pub_staircase_polygon.publish(msg);
-            j++;
         }
+        j++;
     }
 
     return;
 }
 
 geometry_msgs::PolygonStamped stairDetector::hull_to_polygon_msg( 
-    const vector<tf::Vector3> & hull )
+    const vector<tf::Vector3> & hull,
+    int seq_id )
 {
     geometry_msgs::PolygonStamped msg;
     msg.header.stamp = ros::Time(0);
     msg.header.frame_id = _frame_world;
+    msg.header.seq = seq_id;
 
     for( int i = 0; i < hull.size(); i++ )
     {
@@ -313,6 +307,7 @@ void stairDetector::setParam(const stairDetectorParams &param)
 
 vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
 {
+    ROS_INFO("IN FILTER_IMG");
     // calculates convex hulls for potential staircases
     vector<vector<vector<cv::Point>>> hulls;
 
@@ -320,7 +315,6 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
     Mat line_img, filtered_line_img;
 
     Mat proc_img = raw_img.clone();
-    // Mat filtered_line_img = raw_img.clone();
     // edge detection
     // canny_edge_detect(img, edge_img);
 
@@ -333,7 +327,6 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
     morph_filter(raw_img, proc_img);
 
     // medianBlur(edge_img, edge_img, 3);
-    // cvtColor(edge_img, edge_img, CV_BINA);
 
     // line detection
     Lines lines;
@@ -358,7 +351,6 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
         // additional filtering on lines within clusters
         vector<Lines> processed_clusters;
         process_clustered_lines(subclustered_lines, processed_clusters);
-        // process_clustered_lines(clustered_lines, processed_clusters);
 
         // draw processed clusters on image
         for (int i = 0; i < processed_clusters.size(); i++)
@@ -449,8 +441,8 @@ void stairDetector::process_clustered_lines(
     for (int i = 0; i < clustered_lines.size(); i++)
     {
         // remove lines in each cluster which do not meet geometric constraints
-        Lines filt_lines = clustered_lines[i];
-        // Lines filt_lines;
+        // Lines filt_lines = clustered_lines[i];
+        Lines filt_lines;
         // filt_lines = filter_lines_by_mid_pts_dist(clustered_lines[i]);
         // filt_lines = filter_lines_by_max_width(filt_lines);
         filt_lines = filter_lines_by_gransac(clustered_lines[i]);
@@ -470,16 +462,10 @@ Lines stairDetector::filter_lines_by_covariance(
     if (lines.size() > 3)
     {
         Eigen::Matrix2d sigma = calc_covariance_matrix(lines);
-        // cov_mats.push_back(sigma);
-        // std::cout << "\ncovariance for cluster: " << std::endl;
-        // std::cout << sigma(0, 0) << ",\t" << sigma(0, 1) << std::endl;
-        // std::cout << sigma(1, 0) << ",\t" << sigma(1, 1) << std::endl;
 
         // eigenvalues of covariance matrix
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(sigma);
         Eigen::Vector2d e_vals = eigensolver.eigenvalues();
-        // std::cout << "eigenvalues for cluster: " << std::endl;
-        // std::cout << e_vals << std::endl;
     }
     return filt_lines;
 }
@@ -550,20 +536,6 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
             }
         }
 
-        // for (int i = 0; i < lines.size() - 1; i++)
-        // {
-        //     std::cout << "min dist = " << min_dists[i] << "\t";
-        //     for (int j = 0; j < lines.size(); j++)
-        //     {
-        //         std::cout << distances.at<float>(i, j) << " ";
-        //     }
-        //     std::cout << "\n";
-        // }
-
-        // std::cout << "---------------------------------"
-        //           << "\n";
-        // double sum = 0;
-        // double mean = 0;
         double sum = std::accumulate(min_dists.begin(), min_dists.end(), 0.0);
         double mean = sum / min_dists.size();
 
@@ -671,24 +643,6 @@ vector<Lines> stairDetector::filter_lines_by_angle(
     angular_clusters.push_back(filt_lines_1);
 
     return angular_clusters;
-
-    // // element i, j is dot product between normal of i
-    // // and distance vector between i and j
-    // Eigen::MatrixXf normal_dist_dot_prods(lines.size(), lines.size());
-    // for (int i = 0; i < lines.size(); i++)
-    // {
-    //     normal_dist_dot_prods(i, i) = 1.0;
-    //     for (int j = i + 1; j < lines.size(); j++)
-    //     {
-    //         double dot_prod = 0;
-    //         Vec2d n_i = get_normal_unit_vector(lines[j]);
-    //         Vec2d d_ij = get_dist_unit_vector(lines[i], lines[j]);
-    //         dot_prod = n_i[0] * d_ij[0] + n_i[1] * d_ij[1];
-    //         normal_dist_dot_prods(i, j) = abs(dot_prod);
-    //         normal_dist_dot_prods(j, i) = 0.0;
-    //         // std::cout << "dot prod: \t" << dot_prod << std::endl;
-    //     }
-    // }
 }
 
 void stairDetector::publish_img_msgs(
@@ -1034,7 +988,7 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
     int64_t start = cv::getTickCount();
     Estimator.Estimate(CandPoints);
     int64_t end = cv::getTickCount();
-    std::cout << "RANSAC took: " << GRANSAC::VPFloat(end - start) / GRANSAC::VPFloat(cv::getTickFrequency()) * 1000.0 << " ms." << std::endl;
+    // std::cout << "RANSAC took: " << GRANSAC::VPFloat(end - start) / GRANSAC::VPFloat(cv::getTickFrequency()) * 1000.0 << " ms." << std::endl;
 
     auto BestInliers = Estimator.GetBestInliers();
     if (BestInliers.size() > 0)
@@ -1063,8 +1017,8 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
         ROS_WARN("Not enough inliers running ransac");
     }
 
-    cout << "Size Lines IN = " << lines_in.size() << endl;
-    cout << "Size Lines OUT = " << lines_out.size() << endl;
+    // cout << "Size Lines IN = " << lines_in.size() << endl;
+    // cout << "Size Lines OUT = " << lines_out.size() << endl;
 
     // lines_out = lines_in;
     return lines_out;

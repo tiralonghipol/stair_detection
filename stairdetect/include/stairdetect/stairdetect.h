@@ -122,7 +122,8 @@ public:
   Eigen::Vector2d px_to_m(const cv::Point & pt);
   void px_to_m_and_publish(
     vector<vector<vector<cv::Point>>> hulls, vector<cv::Point> hull_centroids_px);
-  geometry_msgs::PolygonStamped hull_to_polygon_msg(const vector<tf::Vector3> & hull);
+  geometry_msgs::PolygonStamped hull_to_polygon_msg(
+    const vector<tf::Vector3> & hull, int seq_id);
 
   Scalar random_color(RNG &rng);
 
