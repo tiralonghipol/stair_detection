@@ -358,7 +358,6 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
         // additional filtering on lines within clusters
         vector<Lines> processed_clusters;
         process_clustered_lines(subclustered_lines, processed_clusters);
-        // process_clustered_lines(clustered_lines, processed_clusters);
 
         // draw processed clusters on image
         for (int i = 0; i < processed_clusters.size(); i++)

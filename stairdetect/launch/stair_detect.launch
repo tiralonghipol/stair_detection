@@ -1,5 +1,5 @@
 <launch>
-    <arg name="rviz" default="true" />
+    <arg name="rviz" default="false" />
     <node name="stairdetect" pkg="stairdetect" type="stairdetect_node" clear_params="true" output="screen">
 
         <!-- topic names -->
