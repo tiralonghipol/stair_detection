@@ -154,9 +154,9 @@ void stairDetector::px_to_m_and_publish(
     vector<vector<tf::Vector3>> hulls_wf(hulls.size());
 
     Eigen::Vector2d xy;
-    for( int i = 0; i < hulls.size(); i++ )
+    for (int i = 0; i < hulls.size(); i++)
     {
-        for( int j = 0; j < hulls[i][0].size(); j++ )
+        for (int j = 0; j < hulls[i][0].size(); j++)
         {
             xy = px_to_m(hulls[i][0][j]);
             hulls_rf[i].push_back(tf::Vector3(xy[0], xy[1], _callback_pose.pose.pose.position.z));
@@ -166,9 +166,9 @@ void stairDetector::px_to_m_and_publish(
 
     // publish the hulls as rviz polygons
     int j = 0;
-    while( j < hulls_rf.size() )
+    while (j < hulls_rf.size())
     {
-        if( hulls_rf[j].size() > 0 )
+        if (hulls_rf[j].size() > 0)
         {
             geometry_msgs::PolygonStamped msg;
             msg = hull_to_polygon_msg(hulls_rf[j], j);
@@ -180,16 +180,16 @@ void stairDetector::px_to_m_and_publish(
     return;
 }
 
-geometry_msgs::PolygonStamped stairDetector::hull_to_polygon_msg( 
-    const vector<tf::Vector3> & hull,
-    int seq_id )
+geometry_msgs::PolygonStamped stairDetector::hull_to_polygon_msg(
+    const vector<tf::Vector3> &hull,
+    int seq_id)
 {
     geometry_msgs::PolygonStamped msg;
     msg.header.stamp = ros::Time(0);
     msg.header.frame_id = _frame_world;
     msg.header.seq = seq_id;
 
-    for( int i = 0; i < hull.size(); i++ )
+    for (int i = 0; i < hull.size(); i++)
     {
         geometry_msgs::Point32 pt;
         pt.x = hull[i][0];
@@ -202,14 +202,12 @@ geometry_msgs::PolygonStamped stairDetector::hull_to_polygon_msg(
 }
 
 Eigen::Vector2d stairDetector::px_to_m(
-    const cv::Point & pt)
+    const cv::Point &pt)
 {
     Eigen::Vector2d xy;
     int img_midpt = int(_param.img_xy_dim / _param.img_resolution) / 2;
-    xy[0] = _callback_pose.pose.pose.position.x
-        - (float(pt.y - img_midpt)) * _param.img_resolution;
-    xy[1] = + _callback_pose.pose.pose.position.y
-        - (float(pt.x - img_midpt)) * _param.img_resolution;
+    xy[0] = _callback_pose.pose.pose.position.x - (float(pt.y - img_midpt)) * _param.img_resolution;
+    xy[1] = +_callback_pose.pose.pose.position.y - (float(pt.x - img_midpt)) * _param.img_resolution;
     return xy;
 }
 
@@ -253,10 +251,7 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
     ROS_INFO("Reconfigure Triggered");
     // high level bools
     _param.debug = config.debug;
-    // canny
-    _param.canny_low_th = config.canny_low_th;
-    _param.canny_ratio = config.canny_ratio;
-    _param.canny_kernel_size = config.canny_kernel_size;
+
     // morphological
     _param.morph_kernel_size = config.morph_kernel_size;
     _param.morph_num_iter = config.morph_num_iter;
@@ -293,15 +288,7 @@ void stairDetector::callback_pose(
 void stairDetector::setParam(const stairDetectorParams &param)
 {
     _param = param;
-    _param.canny_kernel_size = _param.canny_kernel_size * 2 + 1;
-    if (_param.canny_kernel_size > 7)
-    {
-        _param.canny_kernel_size = 7;
-    }
-    if (_param.canny_kernel_size < 1)
-    {
-        _param.canny_kernel_size = 1;
-    }
+
     return;
 }
 
@@ -316,7 +303,6 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
 
     Mat proc_img = raw_img.clone();
     // edge detection
-    // canny_edge_detect(img, edge_img);
 
     // Mat morph_img(raw_img.size(), CV_8UC1);
     // morph_filter(raw_img, morph_img);
@@ -677,15 +663,6 @@ void stairDetector::publish_img_msgs(
     return;
 }
 
-void stairDetector::canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge)
-{
-    /// Reduce noise with a kernel 3x3
-    blur(input_image, edge, Size(3, 3));
-    /// Canny detector
-    Canny(edge, edge, (double)_param.canny_low_th, (double)_param.canny_low_th * _param.canny_ratio, _param.canny_kernel_size);
-    return;
-}
-
 void stairDetector::morph_filter(const cv::Mat &img_in, cv::Mat &img_out)
 {
     // erosion, dilation filters
@@ -875,100 +852,12 @@ Eigen::Matrix2d stairDetector::calc_covariance_matrix(const Lines &lines)
     return cov_mat;
 }
 
-bool stairDetector::get_bounding_box(const cv::Mat &input_image, const Lines &lines, std::vector<cv::Point> &bounding_box)
-
-{
-    bounding_box.clear();
-    std::vector<int> valid_ids;
-
-    int left_most = input_image.cols;
-    int right_most = -1;
-    int up_most = input_image.rows;
-    int down_most = -1;
-    vector<double> x_vals;
-
-    for (int i = 0; i < lines.size(); i++)
-    {
-        for (int j = 0; j < lines[i].pixels.size(); j++)
-        {
-
-            int x1 = lines[i].p1.x;
-            int x2 = lines[i].p2.x;
-            if (x1 < left_most)
-            {
-                left_most = x1;
-            }
-            if (x1 > right_most)
-            {
-                right_most = x1;
-            }
-            if (x2 < left_most)
-            {
-                left_most = x2;
-            }
-            if (x2 > right_most)
-            {
-                right_most = x2;
-            }
-            valid_ids.push_back(i);
-            break;
-        }
-    }
-    for (int i = 0; i < valid_ids.size(); i++)
-    {
-        int id = valid_ids[i];
-        // ignore lines if it's length is smaller than 20
-        if (lines[id].length < 20)
-        {
-            continue;
-        }
-        for (int j = 0; j < lines[id].pixels.size(); j++)
-        {
-            int x = lines[id].pixels[j].x;
-            int y = lines[id].pixels[j].y;
-            if (x < left_most || x > right_most)
-            {
-                break;
-            }
-            if (y < up_most)
-            {
-                up_most = y;
-            }
-            if (y > down_most)
-            {
-                down_most = y;
-            }
-        }
-    }
-    cv::Point p1(left_most, up_most);
-    cv::Point p2(right_most, down_most);
-
-    bounding_box.push_back(p1);
-    bounding_box.push_back(p2);
-    return true;
-}
-
-void stairDetector::draw_bounding_box(cv::Mat &image, const std::vector<cv::Point> &bounding_box)
-{
-    if (bounding_box.size() != 2)
-    {
-        if (_param.debug)
-        {
-            std::cout << "Can't draw boxes because the point size is not equal to 2" << std::endl;
-        }
-        return;
-    }
-    cv::rectangle(image, bounding_box[0], bounding_box[1], cv::Scalar(0, 255, 0), 3, 8);
-}
-
 Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
 {
     vector<Point> mid_points;
     Vec4f inliers;
     Lines lines_out;
 
-    cv::Mat Canvas(500, 500, CV_8UC3);
-    Canvas.setTo(255);
 
     for (auto r : lines_in)
         mid_points.push_back(r.p_mid);
@@ -977,7 +866,6 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
     for (int i = 0; i < lines_in.size(); ++i)
     {
         Point Pt(lines_in[i].p_mid.x, lines_in[i].p_mid.y);
-        circle(Canvas, Pt, 8, Scalar(0, 255, 0), 2, 8);
 
         std::shared_ptr<GRANSAC::AbstractParameter> CandPt = std::make_shared<Point2D>(Pt.x, Pt.y);
         CandPoints.push_back(CandPt);
@@ -988,6 +876,7 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
     int64_t start = cv::getTickCount();
     Estimator.Estimate(CandPoints);
     int64_t end = cv::getTickCount();
+   
     // std::cout << "RANSAC took: " << GRANSAC::VPFloat(end - start) / GRANSAC::VPFloat(cv::getTickFrequency()) * 1000.0 << " ms." << std::endl;
 
     auto BestInliers = Estimator.GetBestInliers();
@@ -1002,8 +891,7 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
         for (auto &Inlier : BestInliers)
         {
             auto RPt = std::dynamic_pointer_cast<Point2D>(Inlier);
-            // cout << "x =" << RPt->m_Point2D[0]
-            //  << "y =" << RPt->m_Point2D[1] << endl;
+            
             Point2f Pt(RPt->m_Point2D[0], RPt->m_Point2D[1]);
             for (auto line : lines_in)
                 if (line.p_mid == Pt)
@@ -1014,29 +902,13 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
     }
     else
     {
-        ROS_WARN("Not enough inliers running ransac");
+        if (_param.debug)
+        {
+            ROS_WARN("Not enough inliers in to run ransac");
+            ROS_INFO("Size Lines IN = %d", lines_in.size());
+            ROS_INFO("Size Lines OUT = %d", lines_out.size());
+        }
     }
 
-    // cout << "Size Lines IN = " << lines_in.size() << endl;
-    // cout << "Size Lines OUT = " << lines_out.size() << endl;
-
-    // lines_out = lines_in;
     return lines_out;
-}
-
-void stairDetector::DrawFullLine(cv::Mat &img, cv::Point a, cv::Point b, cv::Scalar color, int LineWidth)
-{
-    GRANSAC::VPFloat slope = Slope(a.x, a.y, b.x, b.y);
-
-    cv::Point p(0, 0), q(img.cols, img.rows);
-
-    p.y = -(a.x - p.x) * slope + a.y;
-    q.y = -(b.x - q.x) * slope + b.y;
-
-    cv::line(img, p, q, color, LineWidth, cv::LINE_AA, 0);
-}
-
-GRANSAC::VPFloat stairDetector::Slope(int x0, int y0, int x1, int y1)
-{
-    return (GRANSAC::VPFloat)(y1 - y0) / (x1 - x0);
 }

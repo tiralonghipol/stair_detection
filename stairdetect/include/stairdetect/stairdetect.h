@@ -83,13 +83,10 @@ public:
   void callback_timer_trigger(const ros::TimerEvent &event);
   void callback_dyn_reconf(stairdetect::StairDetectConfig &config, uint32_t level);
 
-  // other functions
-  void pcl_to_bird_view(const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg);
-
   // image operations
   void pcl_to_bird_view_img(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, cv::Mat &img);
   vector<vector<vector<cv::Point>>> filter_img(cv::Mat &img);
-  void canny_edge_detect(const cv::Mat &input_image, cv::Mat &edge);
+
   void morph_filter(const cv::Mat &img_in, cv::Mat &img_out);
   void skeleton_filter(const cv::Mat &img_in, cv::Mat &img_out);
   void lsd_lines(const cv::Mat &img_in, Lines &lines);
@@ -97,7 +94,6 @@ public:
   // visualization
   void draw_lines(cv::Mat &image, const Lines &lines, const cv::Scalar &color);
   void draw_clustered_lines(cv::Mat &image, const vector<Lines> &clustered_lines);
-  void draw_bounding_box(cv::Mat &image, const std::vector<cv::Point> &bounding_box);
 
   // publish
   void publish_img_msgs(cv::Mat &img_bird_view, cv::Mat &img_proc, cv::Mat &img_line, cv::Mat &img_line_filtered);
@@ -111,24 +107,18 @@ public:
   Lines filter_lines_by_mid_pts_dist(const Lines &lines_in);
   Lines filter_lines_by_max_width(const Lines &lines_in);
   Lines filter_lines_by_covariance(const Lines &lines_in);
-
   Lines filter_lines_by_gransac(const Lines &lines_in);
-  void DrawFullLine(cv::Mat &img, cv::Point a, cv::Point b, cv::Scalar color, int LineWidth);
-  GRANSAC::VPFloat Slope(int x0, int y0, int x1, int y1);
 
   Eigen::Matrix2d calc_covariance_matrix(const Lines &lines);
-  vector<vector<cv::Point>> calc_cluster_bounds(const Lines & lines);
+  vector<vector<cv::Point>> calc_cluster_bounds(const Lines &lines);
   // Eigen::Vector2d px_to_m(const cv::Point & pt);
-  Eigen::Vector2d px_to_m(const cv::Point & pt);
-  void px_to_m_and_publish(
-    vector<vector<vector<cv::Point>>> hulls, vector<cv::Point> hull_centroids_px);
-  geometry_msgs::PolygonStamped hull_to_polygon_msg(
-    const vector<tf::Vector3> & hull, int seq_id);
+  Eigen::Vector2d px_to_m(const cv::Point &pt);
+  void px_to_m_and_publish(vector<vector<vector<cv::Point>>> hulls, vector<cv::Point> hull_centroids_px);
+  geometry_msgs::PolygonStamped hull_to_polygon_msg(const vector<tf::Vector3> &hull, int seq_id);
 
   Scalar random_color(RNG &rng);
 
   cv::Point calc_centroid_pixel(const vector<cv::Point> &hull);
-  bool get_bounding_box(const cv::Mat &input_image, const Lines &lines, std::vector<cv::Point> &bounding_box);
 
 private:
   // subscribers
@@ -146,7 +136,6 @@ private:
   image_transport::Publisher _pub_morph_img;
   image_transport::Publisher _pub_line_img;
   image_transport::Publisher _pub_filtered_line_img;
-
 
   // timers
   ros::Timer _timer_stair_detect;
@@ -174,7 +163,6 @@ private:
   tf::StampedTransform _recent_tf;
   geometry_msgs::PoseWithCovarianceStamped _callback_pose;
   tf::StampedTransform _callback_tf;
-
 
   // parameter container
   stairDetectorParams _param;

@@ -3,9 +3,7 @@ Panels:
     Help Height: 0
     Name: Displays
     Property Tree Widget:
-      Expanded:
-        - /Image1
-        - /Polygon1
+      Expanded: ~
       Splitter Ratio: 0.5
     Tree Height: 378
   - Class: rviz/Selection
