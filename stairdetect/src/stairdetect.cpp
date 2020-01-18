@@ -74,7 +74,7 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     {
         _colorTab.push_back(random_color(rng));
     }
-    setParam(_param);
+    set_param(_param);
 }
 
 void stairDetector::callback_stitched_pcl(
@@ -304,7 +304,7 @@ void stairDetector::callback_dyn_reconf(stairdetect::StairDetectConfig &config, 
     _param.staircase_max_area = config.staircase_max_area;
     _param.staircase_min_area = config.staircase_min_area;
 
-    setParam(_param);
+    set_param(_param);
     return;
 }
 
@@ -324,7 +324,7 @@ void stairDetector::callback_pose(
     return;
 }
 
-void stairDetector::setParam(const stairDetectorParams &param)
+void stairDetector::set_param(const stairDetectorParams &param)
 {
     _param = param;
     return;
@@ -391,16 +391,12 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
         }
 
         // draw convex hulls on the image
-        for (int i = 0; i < hulls.size(); i++)
-        {
-            drawContours(filtered_line_img, hulls[i], -1, Scalar(0, 255, 0), 2);
-        }
+        for (auto hull : hulls)
+            drawContours(filtered_line_img, hull, -1, Scalar(0, 255, 0), 2);
 
         // publish images
         if (_param.debug)
-        {
             publish_img_msgs(raw_img, proc_img, line_img, filtered_line_img);
-        }
     }
     else
     {
@@ -472,23 +468,6 @@ void stairDetector::process_clustered_lines(
     }
 
     return;
-}
-
-Lines stairDetector::filter_lines_by_covariance(
-    const Lines &lines)
-{
-    Lines filt_lines;
-
-    // get covariance matrix for each cluster
-    if (lines.size() > _min_stair_steps)
-    {
-        Eigen::Matrix2d sigma = calc_covariance_matrix(lines);
-
-        // eigenvalues of covariance matrix
-        Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(sigma);
-        Eigen::Vector2d e_vals = eigensolver.eigenvalues();
-    }
-    return filt_lines;
 }
 
 Lines stairDetector::filter_lines_by_mid_pts_dist(
@@ -739,9 +718,9 @@ void stairDetector::lsd_lines(const cv::Mat &img_in, Lines &lines)
         _param.lsd_n_bins);
     lsd->detect(img_in, xy_lines);
 
-    for (int i = 0; i < xy_lines.size(); i++)
+    for (auto it : xy_lines)
     {
-        Line line(xy_lines[i]);
+        Line line(it);
         line.calPixels(img_in);
         lines.push_back(line);
     }
@@ -761,26 +740,11 @@ void stairDetector::cluster_by_kmeans(
     vector<Lines> &clustered_lines)
 {
     int i, j;
-    Mat labels, centers;
+    Mat points, labels, centers;
 
-    // Method 1) use only x,y
-    Mat points;
-    Mat slopes(lines.size(), 3, CV_32F);
-
-    for (i = 0; i < lines.size(); i++)
+    for (auto line : lines)
     {
-        points.push_back(lines[i].p_mid);
-    }
-
-    // Method 2) use both x,y and slope
-    for (i = 0; i < lines.size(); i++)
-    {
-        slopes.at<float>(i, 0) = lines[i].p_mid.x;
-        slopes.at<float>(i, 1) = lines[i].p_mid.y;
-        if (isinf(lines[i].k))
-            slopes.at<float>(i, 2) = 9999;
-        else
-            slopes.at<float>(i, 2) = lines[i].k;
+        points.push_back(line.p_mid);
     }
 
     if (points.rows >= _max_clusters)
@@ -857,11 +821,7 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
 
     GRANSAC::RANSAC<Line2DModel, 2> Estimator;
     Estimator.Initialize(10, 100); // Threshold, iterations
-    // int64_t start = cv::getTickCount();
     Estimator.Estimate(CandPoints);
-    // int64_t end = cv::getTickCount();
-
-    // std::cout << "RANSAC took: " << GRANSAC::VPFloat(end - start) / GRANSAC::VPFloat(cv::getTickFrequency()) * 1000.0 << " ms." << std::endl;
 
     auto BestInliers = Estimator.GetBestInliers();
     if (BestInliers.size() > 0)

@@ -47,7 +47,7 @@ struct stairDetectorParams
 
   // morphological filter
   int morph_kernel_size = 2;
-  int morph_num_iter = 3;
+  int morph_num_iter = 2;
 
   // line segment detection
   // https://codeutils.xyz/OpenCV3.3.0/dd/d1a/group__imgproc__feature.html#ga6b2ad2353c337c42551b521a73eeae7d
@@ -72,7 +72,7 @@ class stairDetector
 {
 public:
   stairDetector(ros::NodeHandle &n, const std::string &s, int bufSize);
-  void setParam(const stairDetectorParams &param);
+  void set_param(const stairDetectorParams &param);
 
   // callbacks
   void callback_stitched_pcl(const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg);
@@ -93,19 +93,19 @@ public:
   // publish
   void publish_img_msgs(cv::Mat &img_bird_view, cv::Mat &img_proc, cv::Mat &img_line, cv::Mat &img_line_filtered);
 
-  // line processing
+  // clustering
   void cluster_by_kmeans(const cv::Mat &img, Lines &lines, vector<Lines> &clustered_lines);
 
+  // filtering
   void process_clustered_lines(const vector<Lines> &clustered_lines, vector<Lines> &processed_lines);
   vector<Lines> subcluster_by_orientation(const vector<Lines> &clustered_lines);
   vector<Lines> filter_lines_by_angle(const Lines &lines_in);
   Lines filter_lines_by_mid_pts_dist(const Lines &lines_in);
-  Lines filter_lines_by_covariance(const Lines &lines_in);
   Lines filter_lines_by_gransac(const Lines &lines_in);
 
   Eigen::Matrix2d calc_covariance_matrix(const Lines &lines);
   vector<vector<cv::Point>> calc_cluster_bounds(const Lines &lines);
-  // Eigen::Vector2d px_to_m(const cv::Point & pt);
+
   Eigen::Vector2d px_to_m(const cv::Point &pt);
   void px_to_m_and_publish(vector<vector<vector<cv::Point>>> hulls, vector<cv::Point> hull_centroids_px);
   geometry_msgs::PolygonStamped hull_to_polygon_msg(const vector<tf::Vector3> &hull, int seq_id);
