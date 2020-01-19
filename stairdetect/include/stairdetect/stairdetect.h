@@ -101,6 +101,7 @@ public:
   vector<Lines> subcluster_by_orientation(const vector<Lines> &clustered_lines);
   vector<Lines> filter_lines_by_angle(const Lines &lines_in);
   Lines filter_lines_by_mid_pts_dist(const Lines &lines_in);
+  Lines filter_lines_by_covariance(const Lines &lines_in);
   Lines filter_lines_by_gransac(const Lines &lines_in);
 
   Eigen::Matrix2d calc_covariance_matrix(const Lines &lines);

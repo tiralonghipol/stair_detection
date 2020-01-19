@@ -470,6 +470,23 @@ void stairDetector::process_clustered_lines(
     return;
 }
 
+Lines stairDetector::filter_lines_by_covariance(
+    const Lines &lines)
+{
+    Lines filt_lines;
+
+    // get covariance matrix for each cluster
+    if (lines.size() > _min_stair_steps)
+    {
+        Eigen::Matrix2d sigma = calc_covariance_matrix(lines);
+
+        // eigenvalues of covariance matrix
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(sigma);
+        Eigen::Vector2d e_vals = eigensolver.eigenvalues();
+    }
+    return filt_lines;
+}
+
 Lines stairDetector::filter_lines_by_mid_pts_dist(
     const Lines &lines)
 {
