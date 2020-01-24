@@ -22,10 +22,11 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
 
     // other params
     n.getParam("stair_detect_timing", _stair_detect_time);
-    n.getParam("num_line_clusters", _max_clusters);
+    n.getParam("max_clusters", _max_clusters);
     n.getParam("min_stair_steps", _min_stair_steps);
     _pose_Q_size = 40;
-
+    _total_centroids.clear();
+    
     // test flag
     n.getParam("debug", _param.debug);
 
@@ -68,11 +69,11 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
         ros::Duration(_stair_detect_time), &stairDetector::callback_timer_trigger, this);
 
     RNG rng(0xFFFFFFFF);
-    // vector<Scalar> colorTab;
+    // vector<Scalar> _color_tab;
 
     for (int i = 0; i < _max_clusters; i++)
     {
-        _colorTab.push_back(random_color(rng));
+        _color_tab.push_back(random_color(rng));
     }
     set_param(_param);
 }
@@ -80,20 +81,23 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
 void stairDetector::callback_stitched_pcl(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg)
 {
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+
+    // // Create the filtering object
+    // pcl::RadiusOutlierRemoval<pcl::PointXYZ> outrem;
+    // // build the filter
+    // outrem.setInputCloud(msg);
+    // outrem.setRadiusSearch(10.0);
+    // outrem.setMinNeighborsInRadius(500);
+    // // apply filter
+    // outrem.filter(*cloud_filtered);
+
     if (!msg->empty())
     {
         // std::cout << msg->header.frame_id << std::endl;
         _recent_pose = _pose_Q[0];
-        // try
-        // {
-        //     _tf_listener.waitForTransform(_frame_world, _frame_pcl, ros::Time(0), ros::Duration(0,2));
-        //     _tf_listener.lookupTransform(_frame_world, _frame_pcl, ros::Time(0), _recent_tf);
-        // }
-        // catch (tf::TransformException ex)
-        // {
-        //     ROS_ERROR("Error finding transform %s", ex.what());
-        // }
         _recent_cloud = msg;
+        // _recent_cloud = cloud_filtered;
     }
     else
     {
@@ -113,6 +117,7 @@ void stairDetector::callback_timer_trigger(
     std::clock_t t_pub_0;
     std::clock_t t_pub_1;
     std::clock_t t_0 = std::clock();
+    double dx, dy;
 
     Mat img(
         int(_param.img_xy_dim / _param.img_resolution),
@@ -145,13 +150,48 @@ void stairDetector::callback_timer_trigger(
         for (int i = 0; i < hulls.size(); i++)
         {
             cv::Point centroid = calc_centroid_pixel(hulls[i][0]);
+
             double hull_area = contourArea(hulls[i][0], false);
             hull_centroids_px.push_back(centroid);
             hull_areas_px.push_back(hull_area);
         }
         t_pub_1 = std::clock();
 
-        px_to_m_and_publish(hulls, hull_centroids_px);
+        // the first time all hulls are accepted
+        if (_total_centroids.empty())
+        {
+
+            for (auto h : hull_centroids_px)
+                _total_centroids.push_back(h);
+            ROS_WARN_ONCE("First time");
+            px_to_m_and_publish(hulls, hull_centroids_px);
+        }
+        // from second time on, check if already present
+        else
+        {
+            for (auto h : hull_centroids_px)
+            {
+                for (auto p : _total_centroids)
+                {
+                    // if (norm(p - h) > 100)
+                    dx = p.x - h.x;
+                    dy = p.y - h.y;
+                    if (_param.debug)
+                        ROS_INFO("Norm = %f", sqrt(dx * dx + dy * dy));
+                    if (sqrt(dx * dx + dy * dy) > _min_dist_between_stairs)
+                    {
+                        _total_centroids.push_back(h);
+                        px_to_m_and_publish(hulls, hull_centroids_px);
+                    }
+                    else
+                    {
+                        if (_param.debug)
+                            ROS_INFO("Hull already detected!");
+                    }
+                }
+            }
+            /* code */
+        }
 
         // check recent potential staircases against previously-found staircases
         // TODO
@@ -715,7 +755,7 @@ void stairDetector::draw_clustered_lines(cv::Mat &image, const vector<Lines> &cl
         for (i = 0; i < clustered_lines[j].size(); i++)
         {
             Point ipt = clustered_lines[j][i].p_mid;
-            circle(image, ipt, 8, _colorTab[j], 2, 8);
+            circle(image, ipt, 8, _color_tab[j], 2, 8);
         }
     }
     return;
@@ -865,7 +905,7 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
     {
         if (_param.debug)
         {
-            ROS_WARN("Not enough inliers in to run ransac");
+            ROS_INFO("Not enough inliers in to run ransac");
             ROS_INFO("Size Lines IN = %d", lines_in.size());
             ROS_INFO("Size Lines OUT = %d", lines_out.size());
         }

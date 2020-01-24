@@ -4,16 +4,21 @@
 #include "ros/ros.h"
 #include "stairdetect/line.h"
 #include "sensor_msgs/PointCloud2.h"
-#include "pcl_ros/point_cloud.h"
-#include "pcl_ros/transforms.h"
-#include "pcl/point_cloud.h"
-#include "pcl/common/transforms.h"
+#include <pcl/point_cloud.h>
+#include <pcl/common/transforms.h>
+
+#include <pcl/filters/radius_outlier_removal.h>
+
 #include <pcl/registration/icp.h>
-#include "pcl_conversions/pcl_conversions.h"
-#include <pcl_ros/filters/voxel_grid.h>
-#include <pcl_ros/filters/crop_box.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
+
+#include <pcl_ros/point_cloud.h>
+#include <pcl_ros/transforms.h>
+#include <pcl_ros/filters/voxel_grid.h>
+#include <pcl_ros/filters/crop_box.h>
+#include <pcl_conversions/pcl_conversions.h>
+
 #include <iostream>
 #include <string>
 #include <cmath>
@@ -29,6 +34,10 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/ml.hpp>
+
+#include <opencv2/ximgproc.hpp>
+
+#include <opencv2/photo.hpp>
 
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
@@ -172,12 +181,16 @@ private:
   int _pose_Q_size;
   std::deque<geometry_msgs::PoseWithCovarianceStamped> _pose_Q;
 
-  //
+  // color generation
+  vector<Scalar> _color_tab;
+
+  // stair parameters
   int _max_clusters;
   int _min_stair_steps = 3;
 
-  // color generation
-  vector<Scalar> _colorTab;
+  // check if stair is already detected
+  vector<Point> _total_centroids;
+  int _min_dist_between_stairs = 500;
 };
 
 #endif

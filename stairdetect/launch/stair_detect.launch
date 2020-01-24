@@ -32,13 +32,13 @@
         <param name="lsd_density_th" value="0.1" type="double"/>
 
         <!-- timing -->
-        <param name="stair_detect_timing" value="5.0" type="double"/>
+        <param name="stair_detect_timing" value="3.0" type="double"/>
 
         <!-- clustering -->
-        <param name="num_line_clusters" value="8" type="int"/>
+        <param name="max_clusters" value="8" type="int"/>
 
         <!-- stair parameters -->
-        <param name="max_clusters" value="8" type="int"/>
+        <param name="min_stair_steps" value="3" type="int"/>
 
     </node>
 
