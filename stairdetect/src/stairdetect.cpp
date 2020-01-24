@@ -26,7 +26,7 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     n.getParam("min_stair_steps", _min_stair_steps);
     _pose_Q_size = 40;
     _total_centroids.clear();
-    
+
     // test flag
     n.getParam("debug", _param.debug);
 
@@ -177,7 +177,7 @@ void stairDetector::callback_timer_trigger(
                     dx = p.x - h.x;
                     dy = p.y - h.y;
                     if (_param.debug)
-                        ROS_INFO("Norm = %f", sqrt(dx * dx + dy * dy));
+                        ROS_INFO("dist = %f", sqrt(dx * dx + dy * dy));
                     if (sqrt(dx * dx + dy * dy) > _min_dist_between_stairs)
                     {
                         _total_centroids.push_back(h);
