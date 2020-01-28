@@ -81,8 +81,12 @@ public:
   void callback_dyn_reconf(stairdetect::StairDetectConfig &config, uint32_t level);
 
   // image operations
-  void pcl_to_bird_view_img(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, cv::Mat &img);
+  void pcl_to_bird_view_img(
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, 
+    cv::Mat &img, 
+    Eigen::MatrixXd &img_height);
   vector<vector<vector<cv::Point>>> filter_img(cv::Mat &img);
+  void filter_height_img(Eigen::MatrixXd & img);
   void morph_filter(const cv::Mat &img_in, cv::Mat &img_out);
   void lsd_lines(const cv::Mat &img_in, Lines &lines);
 
@@ -103,14 +107,21 @@ public:
   Lines filter_lines_by_covariance(const Lines &lines_in);
   Lines filter_lines_by_gransac(const Lines &lines_in);
 
-  Eigen::Matrix2d calc_covariance_matrix(const Lines &lines);
+  Eigen::MatrixXd calc_covariance_matrix(const Lines &lines);
   vector<vector<cv::Point>> calc_cluster_bounds(const Lines &lines);
-  // Eigen::Vector2d px_to_m(const cv::Point & pt);
   Eigen::Vector2d px_to_m(const cv::Point &pt);
-  void px_to_m_and_publish(vector<vector<vector<cv::Point>>> hulls, vector<cv::Point> hull_centroids_px);
-  geometry_msgs::PolygonStamped hull_to_polygon_msg(const vector<tf::Vector3> &hull, int seq_id);
+  void px_to_m_and_publish(
+    vector<vector<vector<cv::Point>>> hulls, 
+    vector<cv::Point> hull_centroids_px, 
+    const Eigen::MatrixXd & img_height);
 
+  geometry_msgs::PolygonStamped hull_to_polygon_msg(
+    const vector<tf::Vector3> &hull, int seq_id);
   bool check_hull_area(const double &hull_area);
+  float get_nonzero_height(
+    const int & idx_x,
+    const int & idx_y,
+    const Eigen::MatrixXd & img);
 
   // clusters colors
   Scalar random_color(RNG &rng);
@@ -157,7 +168,6 @@ private:
   // reference to most recently-received cloud
   pcl::PointCloud<pcl::PointXYZ>::Ptr _recent_cloud;
   geometry_msgs::PoseWithCovarianceStamped _recent_pose;
-  tf::StampedTransform _recent_tf;
   geometry_msgs::PoseWithCovarianceStamped _callback_pose;
 
   // parameter container
@@ -171,7 +181,7 @@ private:
   int _pose_Q_size;
   std::deque<geometry_msgs::PoseWithCovarianceStamped> _pose_Q;
 
-  //
+  // 
   int _max_clusters;
   int _min_stair_steps = 3;
 

@@ -50,7 +50,6 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
 
     // publishers
     _pub_trimmed_pcl = n.advertise<sensor_msgs::PointCloud2>(_topic_trimmed_pcl, bufSize);
-    // _pub_staircase_polygon = n.advertise<geometry_msgs::PolygonStamped>(_topic_polygon, bufSize);
     _pub_staircase_polygon = n.advertise<geometry_msgs::PolygonStamped>(_topic_polygon, 10);
 
     image_transport::ImageTransport it_0(n);
@@ -80,19 +79,10 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
 void stairDetector::callback_stitched_pcl(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg)
 {
+    ROS_INFO("\nSTITCHED CLOUD RECEIVED IN STAIRDETECT");
     if (!msg->empty())
     {
-        // std::cout << msg->header.frame_id << std::endl;
         _recent_pose = _pose_Q[0];
-        // try
-        // {
-        //     _tf_listener.waitForTransform(_frame_world, _frame_pcl, ros::Time(0), ros::Duration(0,2));
-        //     _tf_listener.lookupTransform(_frame_world, _frame_pcl, ros::Time(0), _recent_tf);
-        // }
-        // catch (tf::TransformException ex)
-        // {
-        //     ROS_ERROR("Error finding transform %s", ex.what());
-        // }
         _recent_cloud = msg;
     }
     else
@@ -120,16 +110,23 @@ void stairDetector::callback_timer_trigger(
         CV_8UC1,
         Scalar(0));
 
+    // ROS_INFO("\nbuilding height image");
+    Eigen::MatrixXd img_height(
+        int(_param.img_xy_dim / _param.img_resolution), 
+        int(_param.img_xy_dim / _param.img_resolution));
+    // ROS_INFO("\nDONE building height image");
+    img_height.setZero();
+    // ROS_INFO("\nDONE building height image");
+
     if (!_recent_cloud->empty())
     {
         if (_param.debug)
             ROS_INFO("In callback timer trigger");
-        // _callback_tf = _recent_tf;
         _callback_pose = _recent_pose;
 
         // convert most recently-received pointcloud to birds-eye-view image
         t_be_0 = std::clock();
-        pcl_to_bird_view_img(_recent_cloud, img);
+        pcl_to_bird_view_img(_recent_cloud, img, img_height);
         t_be_1 = std::clock();
 
         // find convex hulls around line clusters
@@ -137,6 +134,9 @@ void stairDetector::callback_timer_trigger(
         t_filt_0 = std::clock();
         hulls = filter_img(img);
         t_filt_1 = std::clock();
+
+        // filter height image
+        filter_height_img(img_height);
 
         // find areas, centroids of potential staircases (in pixels)
         t_pub_0 = std::clock();
@@ -151,7 +151,7 @@ void stairDetector::callback_timer_trigger(
         }
         t_pub_1 = std::clock();
 
-        px_to_m_and_publish(hulls, hull_centroids_px);
+        px_to_m_and_publish(hulls, hull_centroids_px, img_height);
 
         // check recent potential staircases against previously-found staircases
         // TODO
@@ -177,6 +177,22 @@ void stairDetector::callback_timer_trigger(
     return;
 }
 
+void stairDetector::filter_height_img(
+    Eigen::MatrixXd & img)
+    // cv::Mat & img)
+{
+    // max filter with 3x3 kernel
+    // dilate(
+    //     img,
+    //     img,
+    //     Mat(3, 3, CV_8UC1),
+    //     Point(-1, -1),
+    //     1,
+    //     1,
+    //     1);
+    return;
+}
+
 bool stairDetector::check_hull_area(
     const double &hull_area)
 {
@@ -187,18 +203,22 @@ bool stairDetector::check_hull_area(
 
 void stairDetector::px_to_m_and_publish(
     vector<vector<vector<cv::Point>>> hulls,
-    vector<cv::Point> hull_centroids_px)
+    vector<cv::Point> hull_centroids_px,
+    const Eigen::MatrixXd & img_height)
 {
     vector<vector<tf::Vector3>> hulls_rf(hulls.size());
     vector<vector<tf::Vector3>> hulls_wf(hulls.size());
 
     Eigen::Vector2d xy;
+    double z = 0;
     for (int i = 0; i < hulls.size(); i++)
     {
         for (int j = 0; j < hulls[i][0].size(); j++)
         {
             xy = px_to_m(hulls[i][0][j]);
-            hulls_rf[i].push_back(tf::Vector3(xy[0], xy[1], _callback_pose.pose.pose.position.z));
+            // z = img_height(hulls[i][0][j].x, hulls[i][0][j].y);
+            z = get_nonzero_height(hulls[i][0][j].x, hulls[i][0][j].y, img_height);
+            hulls_rf[i].push_back(tf::Vector3(xy[0], xy[1], z));
         }
     }
     if (_param.debug)
@@ -220,6 +240,33 @@ void stairDetector::px_to_m_and_publish(
     return;
 }
 
+float stairDetector::get_nonzero_height(
+    const int & idx_x,
+    const int & idx_y,
+    const Eigen::MatrixXd & img)
+{
+    float height = img(idx_x, idx_y);
+    int ctr = 0;
+    int num_pixel = int(_param.img_xy_dim / _param.img_resolution);
+    while( height == 0.0 )
+    {
+        int i = min(idx_x - ctr, 0);
+        int j = min(idx_y - ctr, 0);
+        while( height == 0.0 && i < min(num_pixel, idx_x + ctr) )
+        {
+            while( height == 0.0 && j < min(num_pixel, idx_y + ctr) )
+            {
+                height = img(i, j);
+                j++;
+            }
+            i++;
+            j = idx_y - ctr;
+        }
+        ctr += 1;
+    }
+    return height;
+}
+
 geometry_msgs::PolygonStamped stairDetector::hull_to_polygon_msg(
     const vector<tf::Vector3> &hull,
     int seq_id)
@@ -237,7 +284,6 @@ geometry_msgs::PolygonStamped stairDetector::hull_to_polygon_msg(
         pt.z = hull[i][2];
         msg.polygon.points.push_back(pt);
     }
-
     return msg;
 }
 
@@ -253,8 +299,10 @@ Eigen::Vector2d stairDetector::px_to_m(
 
 void stairDetector::pcl_to_bird_view_img(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
-    cv::Mat &img)
+    cv::Mat &img,
+    Eigen::MatrixXd & img_height)
 {
+    ROS_INFO("BUILDING BIRDS-EYE IMAGE");
     int img_midpt = int(_param.img_xy_dim / _param.img_resolution) / 2;
 
     // get current xy
@@ -269,13 +317,14 @@ void stairDetector::pcl_to_bird_view_img(
         idx_x = int((x_0 - pt.x) / _param.img_resolution) + img_midpt;
         idx_y = int((y_0 - pt.y) / _param.img_resolution) + img_midpt;
 
-        /* 
-        must check that pixel index lies with image, as robot may have moved since
-        the stitched pointcloud was constructed
-        */
         if (!(idx_x >= img.size().width || idx_y >= img.size().height) && !(idx_x < 0 || idx_y < 0))
         {
             img.at<uchar>(idx_x, idx_y) = 255;
+            // keep highest point at a given pixel 
+            if( pt.z != 0 )
+            {
+                img_height(idx_x, idx_y) = pt.z;
+            }
         }
     }
     return;
@@ -397,7 +446,7 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
         }
 
         // publish images
-        if (_param.debug)
+        if (true)
         {
             publish_img_msgs(raw_img, proc_img, line_img, filtered_line_img);
         }
@@ -407,7 +456,6 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
         if (_param.debug)
             ROS_INFO("Not enough lines detected");
     }
-
     return hulls;
 }
 
@@ -451,7 +499,6 @@ vector<vector<cv::Point>> stairDetector::calc_cluster_bounds(
             convexHull(Mat(line_endpoints[i]), hull[i], false);
         }
     }
-
     return hull;
 }
 
@@ -470,7 +517,6 @@ void stairDetector::process_clustered_lines(
         filt_lines = filter_lines_by_mid_pts_dist(filt_lines);
         processed_lines.push_back(filt_lines);
     }
-
     return;
 }
 
@@ -482,10 +528,10 @@ Lines stairDetector::filter_lines_by_covariance(
     // get covariance matrix for each cluster
     if (lines.size() > _min_stair_steps)
     {
-        Eigen::Matrix2d sigma = calc_covariance_matrix(lines);
+        Eigen::MatrixXd sigma = calc_covariance_matrix(lines);
 
         // eigenvalues of covariance matrix
-        Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(sigma);
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(sigma);
         Eigen::Vector2d e_vals = eigensolver.eigenvalues();
     }
     return filt_lines;
@@ -596,7 +642,7 @@ vector<Lines> stairDetector::filter_lines_by_angle(
     vector<Lines> angular_clusters;
 
     // element i, j is dot product between normals of lines i, j
-    Eigen::MatrixXf normal_dot_prods(lines.size(), lines.size());
+    Eigen::MatrixXd normal_dot_prods(lines.size(), lines.size());
     for (int i = 0; i < lines.size(); i++)
     {
         normal_dot_prods(i, i) = 1.0;
@@ -641,10 +687,8 @@ vector<Lines> stairDetector::filter_lines_by_angle(
             filt_lines_1.push_back(lines[i]);
         }
     }
-
     angular_clusters.push_back(filt_lines_0);
     angular_clusters.push_back(filt_lines_1);
-
     return angular_clusters;
 }
 
@@ -809,9 +853,9 @@ void stairDetector::cluster_by_kmeans(
     }
     return;
 }
-Eigen::Matrix2d stairDetector::calc_covariance_matrix(const Lines &lines)
+Eigen::MatrixXd stairDetector::calc_covariance_matrix(const Lines &lines)
 {
-    Eigen::Matrix2d cov_mat;
+    Eigen::MatrixXd cov_mat;
     double x_bar;
     double y_bar;
 
@@ -861,8 +905,6 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
     Estimator.Estimate(CandPoints);
     // int64_t end = cv::getTickCount();
 
-    // std::cout << "RANSAC took: " << GRANSAC::VPFloat(end - start) / GRANSAC::VPFloat(cv::getTickFrequency()) * 1000.0 << " ms." << std::endl;
-
     auto BestInliers = Estimator.GetBestInliers();
     if (BestInliers.size() > 0)
     {
@@ -893,6 +935,5 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
             ROS_INFO("Size Lines OUT = %d", lines_out.size());
         }
     }
-
     return lines_out;
 }

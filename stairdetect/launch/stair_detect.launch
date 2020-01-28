@@ -4,6 +4,7 @@
 
         <!-- topic names -->
         <param name="topic_stitched_pointcloud" value="/lidar_stitch/points_stitched" type="str"/>
+        <!-- <param name="topic_stitched_pointcloud" value="/lidar_stitch/registered_points_stitched" type="str"/> -->
         <param name="topic_pose" value="/msf_core/pose" type="str"/>
         <param name="topic_trimmed_pcl" value="trimmed_pcl" type="str"/>
         <param name="topic_bird_eye_img" value="bird_eye_img" type="str"/>
@@ -17,7 +18,7 @@
         <param name="frame_pcl" value="/velodyne" type="str"/>
 
         <!-- dynamic parameters-->
-        <param name="debug" value="true" type="bool"/>
+        <param name="debug" value="false" type="bool"/>
 
         <!-- line segment detector -->
         <param name="lsd_scale" value=" 0.25" type="double"/>
