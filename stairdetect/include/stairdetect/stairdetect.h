@@ -8,6 +8,7 @@
 #include <pcl/common/transforms.h>
 
 #include <pcl/filters/radius_outlier_removal.h>
+#include <pcl/filters/statistical_outlier_removal.h>
 
 #include <pcl/registration/icp.h>
 #include <pcl/io/pcd_io.h>
@@ -36,7 +37,6 @@
 #include <opencv2/ml.hpp>
 
 #include <opencv2/ximgproc.hpp>
-
 #include <opencv2/photo.hpp>
 
 #include <cv_bridge/cv_bridge.h>
@@ -57,6 +57,8 @@ struct stairDetectorParams
   // morphological filter
   int morph_kernel_size = 2;
   int morph_num_iter = 2;
+
+  int median_kernel_size = 3;
 
   // line segment detection
   // https://codeutils.xyz/OpenCV3.3.0/dd/d1a/group__imgproc__feature.html#ga6b2ad2353c337c42551b521a73eeae7d
@@ -190,7 +192,7 @@ private:
 
   // check if stair is already detected
   vector<Point> _total_centroids;
-  int _min_dist_between_stairs = 500;
+  int _min_dist_between_stairs = 100;
 };
 
 #endif

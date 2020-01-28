@@ -4,6 +4,7 @@
 
         <!-- topic names -->
         <param name="topic_stitched_pointcloud" value="/lidar_stitch/points_stitched" type="str"/>
+        <!-- <param name="topic_stitched_pointcloud" value="/os1_node/points_raw" type="str"/> -->
         <param name="topic_pose" value="/msf_core/pose" type="str"/>
         <param name="topic_trimmed_pcl" value="trimmed_pcl" type="str"/>
         <param name="topic_bird_eye_img" value="bird_eye_img" type="str"/>
@@ -20,8 +21,10 @@
         <param name="debug" value="true" type="bool"/>
 
         <!-- morphological filter -->
-        <param name="morph_kernel_size" value="2" type="int"/>
-        <param name="morph_num_iter" value="2" type="int"/>
+        <param name="morph_kernel_size" value="1" type="int"/>
+        <param name="morph_num_iter" value="1" type="int"/>
+        <!-- median blur -->
+        <param name="median_kernel_size" value="3" type="int"/>
 
         <!-- line segment detector -->
         <param name="lsd_scale" value=" 0.25" type="double"/>
@@ -32,7 +35,7 @@
         <param name="lsd_density_th" value="0.1" type="double"/>
 
         <!-- timing -->
-        <param name="stair_detect_timing" value="3.0" type="double"/>
+        <param name="stair_detect_timing" value="5.0" type="double"/>
 
         <!-- clustering -->
         <param name="max_clusters" value="8" type="int"/>
