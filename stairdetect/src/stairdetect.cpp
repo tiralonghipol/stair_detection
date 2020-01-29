@@ -41,7 +41,7 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     while (sharedPtr == NULL)
     {
         if (_param.debug)
-            ROS_INFO("Stitched PCL not received yet");
+            ROS_INFO_ONCE("Stitched PCL not received yet");
         sharedPtr = ros::topic::waitForMessage<sensor_msgs::PointCloud2>(_topic_stitched_pcl, ros::Duration(2));
     }
 
@@ -382,11 +382,8 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
     Mat proc_img = raw_img.clone();
 
     Mat morph_img(raw_img.size(), CV_8UC1);
-    medianBlur(raw_img, proc_img, _param.median_kernel_size);
-    morph_filter(proc_img, proc_img);
-    // cv::ximgproc::thinning(proc_img, proc_img);
-    // imshow("Original", raw_img);   // Show our image inside it.
-    // imshow("Processed", proc_img); // Show our image inside it.
+    // medianBlur(raw_img, proc_img, _param.median_kernel_size);
+    morph_filter(raw_img, proc_img);
 
     // line detection
     Lines lines;
@@ -591,7 +588,7 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
         if (_param.debug)
             ROS_INFO("Mean = %f | Variance = %f", mean, stdev);
 
-        if (stdev < 20 && mean < 60)
+        if (stdev < 20)
         {
             if (_param.debug)
                 ROS_INFO("Potential stair!");
@@ -604,6 +601,7 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
     }
 
     min_dists.clear();
+
     return filt_lines;
 }
 
@@ -722,34 +720,26 @@ void stairDetector::publish_img_msgs(
 
 void stairDetector::morph_filter(const cv::Mat &img_in, cv::Mat &img_out)
 {
+
     // erosion, dilation filters
     // https://docs.opencv.org/trunk/d4/d86/group__imgproc__filter.html#gaeb1e0c1033e3f6b891a25d0511362aeb
-    // dilate(
-    //     img_in,
-    //     img_out,
-    //     Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1),
-    //     Point(-1, -1),
-    //     1,
-    //     1,
-    //     1);
-    // erode(
-    //     img_out,
-    //     img_out,
-    //     Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1),
-    //     Point(-1, -1),
-    //     _param.morph_num_iter,
-    //     1,
-    //     1);
 
-    Mat element = getStructuringElement(
-        0,
-        Size(2 * _param.morph_kernel_size + 1, 2 * _param.morph_kernel_size + 1),
-        Point(_param.morph_kernel_size, _param.morph_kernel_size));
-
-    // morphologyEx(img_in, img_out, MORPH_CLOSE, element);
-    morphologyEx(img_in, img_out, MORPH_OPEN, element, Point(-1, -1), _param.morph_num_iter);
-    morphologyEx(img_out, img_out, MORPH_ERODE, element, Point(-1, -1), _param.morph_num_iter);
-    // morphologyEx(img_in, img_out, MORPH_CLOSE, element);
+    dilate(
+        img_in,
+        img_out,
+        Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1),
+        Point(-1, -1),
+        1,
+        1,
+        1);
+    erode(
+        img_out,
+        img_out,
+        Mat(_param.morph_kernel_size, _param.morph_kernel_size, CV_8UC1),
+        Point(-1, -1),
+        _param.morph_num_iter,
+        1,
+        1);
 
     return;
 }
