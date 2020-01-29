@@ -212,7 +212,7 @@ private:
   // vector<Point> _total_centroids;
   vector<Eigen::Vector2d> _confirmed_centroids;
   vector<Eigen::Vector2d> _unconfirmed_centroids;
-  int _min_dist_between_stairs = 100;
+  int _min_dist_between_stairs = 1.5;
 };
 
 #endif

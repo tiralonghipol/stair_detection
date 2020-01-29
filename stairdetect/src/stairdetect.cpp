@@ -73,7 +73,6 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
         ros::Duration(_stair_detect_time), &stairDetector::callback_timer_trigger, this);
 
     RNG rng(0xFFFFFFFF);
-    // vector<Scalar> _color_tab;
 
     for (int i = 0; i < _max_clusters; i++)
     {
@@ -95,7 +94,6 @@ void stairDetector::callback_stitched_pcl(
 
     if (!msg->empty())
     {
-        // std::cout << msg->header.frame_id << std::endl;
         _recent_pose = _pose_Q[0];
         _recent_cloud = msg;
         // _recent_cloud = cloud_filtered;
@@ -145,8 +143,6 @@ void stairDetector::callback_timer_trigger(
     // publish convex hull polygons
     for (auto h : hull_bounds_wf)
     {   
-        ROS_INFO("\nATTEMPTING TO PUBLISH POLYGON");
-        std::cout << h.size() << std::endl;
         geometry_msgs::PolygonStamped hull_msg = hull_to_polygon_msg(h, 1);
         _pub_staircase_polygon.publish(hull_msg);
     }
@@ -199,7 +195,6 @@ void stairDetector::process_and_publish_centroids(
                     // and place it in the confirmed list
                     if (sqrt(dx * dx + dy * dy) < _min_dist_between_stairs)
                     {
-                    ROS_INFO("\nNEW confirmed CENTROID FOUND");
                         // centroid has position = average of previous and new
                         Eigen::Vector2d centroid_to_publish;
                         centroid_to_publish[0] = (c_new[0] + _unconfirmed_centroids[i][0]) / 2.0;
@@ -229,7 +224,6 @@ void stairDetector::process_and_publish_centroids(
                 // add all new unconfirmed centroids
                 for (auto c_new_unconf : new_unconf_centroids)
                 {
-                    ROS_INFO("\nNEW UNCONFIRMED CENTROID FOUND");
                     _unconfirmed_centroids.push_back(c_new_unconf);
                 }
             }  
@@ -256,7 +250,7 @@ vector<vector<Eigen::Vector3d>> stairDetector::hull_px_to_wf(
     for (int i = 0; i < hulls.size(); i++)
     {
         vector<Eigen::Vector3d> hull;
-        for (int j = 0; j < hulls[i].size(); j++ ) 
+        for (int j = 0; j < hulls[i][0].size(); j++ ) 
         {
             xy = px_to_m(hulls[i][0][j]);
             hull.push_back(Eigen::Vector3d(xy[0], xy[1], _callback_pose.pose.pose.position.z));
@@ -313,9 +307,9 @@ visualization_msgs::Marker stairDetector::centroid_to_marker_msg(
     msg.type = visualization_msgs::Marker::SPHERE;
     msg.lifetime = ros::Duration(5);
 
-    msg.scale.x = 1.0;
-    msg.scale.y = 1.0;
-    msg.scale.z = 1.0;
+    msg.scale.x = 0.5;
+    msg.scale.y = 0.5;
+    msg.scale.z = 0.5;
 
     msg.color.a = 1.0;
     msg.color.g = 0.05;
@@ -794,7 +788,6 @@ void stairDetector::morph_filter(const cv::Mat &img_in, cv::Mat &img_out)
     morphologyEx(img_in, img_out, MORPH_OPEN, element, Point(-1, -1), _param.morph_num_iter);
     morphologyEx(img_out, img_out, MORPH_ERODE, element, Point(-1, -1), _param.morph_num_iter);
     // morphologyEx(img_in, img_out, MORPH_CLOSE, element);
-
     return;
 }
 
@@ -945,6 +938,5 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
             ROS_INFO("Size Lines OUT = %d", lines_out.size());
         }
     }
-
     return lines_out;
 }
