@@ -15,6 +15,8 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     n.getParam("topic_line_img", _topic_line_img);
     n.getParam("topic_filtered_line_img", _topic_filtered_line_img);
     n.getParam("topic_staircase_polygon", _topic_polygon);
+    n.getParam("topic_staircase_centroid", _topic_centroid_vis);
+    n.getParam("topic_staircase_centroid_pose", _topic_centroid_pose);
 
     // frames
     n.getParam("frame_world", _frame_world);
@@ -25,7 +27,8 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     n.getParam("max_clusters", _max_clusters);
     n.getParam("min_stair_steps", _min_stair_steps);
     _pose_Q_size = 40;
-    _total_centroids.clear();
+    _confirmed_centroids.clear();
+    _unconfirmed_centroids.clear();
 
     // test flag
     n.getParam("debug", _param.debug);
@@ -51,8 +54,9 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
 
     // publishers
     _pub_trimmed_pcl = n.advertise<sensor_msgs::PointCloud2>(_topic_trimmed_pcl, bufSize);
-    // _pub_staircase_polygon = n.advertise<geometry_msgs::PolygonStamped>(_topic_polygon, bufSize);
     _pub_staircase_polygon = n.advertise<geometry_msgs::PolygonStamped>(_topic_polygon, 10);
+    _pub_centroid_marker = n.advertise<visualization_msgs::Marker>(_topic_centroid_vis, 10);
+    _pub_centroid_pose = n.advertise<geometry_msgs::PoseStamped>(_topic_centroid_pose, 10);
 
     image_transport::ImageTransport it_0(n);
     _pub_bird_view_img = it_0.advertise(_topic_bird_eye_img, 1);
@@ -107,14 +111,10 @@ void stairDetector::callback_stitched_pcl(
 void stairDetector::callback_timer_trigger(
     const ros::TimerEvent &event)
 {
-    std::clock_t t_be_0;
-    std::clock_t t_be_1;
-    std::clock_t t_filt_0;
-    std::clock_t t_filt_1;
-    std::clock_t t_pub_0;
-    std::clock_t t_pub_1;
-    std::clock_t t_0 = std::clock();
-    double dx, dy;
+    if (_recent_cloud->empty())
+    {
+        return;
+    }
 
     Mat img(
         int(_param.img_xy_dim / _param.img_resolution),
@@ -122,98 +122,123 @@ void stairDetector::callback_timer_trigger(
         CV_8UC1,
         Scalar(0));
 
-    if (!_recent_cloud->empty())
+    _callback_pose = _recent_pose;
+
+    // convert most recently-received pointcloud to birds-eye-view image
+    pcl_to_bird_view_img(_recent_cloud, img);
+
+    // find convex hulls around line clusters
+    vector<vector<vector<cv::Point>>> hulls;
+    hulls = filter_img(img);
+
+    // find centroids of potential staircases (in pixels)
+    vector<cv::Point> hull_centroids_px;
+    for (int i = 0; i < hulls.size(); i++)
     {
-        if (_param.debug)
-            ROS_INFO("In callback timer trigger");
-        // _callback_tf = _recent_tf;
-        _callback_pose = _recent_pose;
-
-        // convert most recently-received pointcloud to birds-eye-view image
-        t_be_0 = std::clock();
-        pcl_to_bird_view_img(_recent_cloud, img);
-        t_be_1 = std::clock();
-
-        // find convex hulls around line clusters
-        vector<vector<vector<cv::Point>>> hulls;
-        t_filt_0 = std::clock();
-        hulls = filter_img(img);
-        t_filt_1 = std::clock();
-
-        // find areas, centroids of potential staircases (in pixels)
-        t_pub_0 = std::clock();
-        vector<double> hull_areas_px;
-        vector<cv::Point> hull_centroids_px;
-        for (int i = 0; i < hulls.size(); i++)
-        {
-            cv::Point centroid = calc_centroid_pixel(hulls[i][0]);
-
-            double hull_area = contourArea(hulls[i][0], false);
-            hull_centroids_px.push_back(centroid);
-            hull_areas_px.push_back(hull_area);
-        }
-        t_pub_1 = std::clock();
-
-        // the first time all hulls are accepted
-        if (_total_centroids.empty())
-        {
-
-            for (auto h : hull_centroids_px)
-                _total_centroids.push_back(h);
-            ROS_WARN_ONCE("First time");
-            px_to_m_and_publish(hulls, hull_centroids_px);
-        }
-        // from second time on, check if already present
-        else
-        {
-            for (auto h : hull_centroids_px)
-            {
-                for (auto p : _total_centroids)
-                {
-                    // if (norm(p - h) > 100)
-                    dx = p.x - h.x;
-                    dy = p.y - h.y;
-                    if (_param.debug)
-                        ROS_INFO("dist = %f", sqrt(dx * dx + dy * dy));
-                    if (sqrt(dx * dx + dy * dy) > _min_dist_between_stairs)
-                    {
-                        _total_centroids.push_back(h);
-                        px_to_m_and_publish(hulls, hull_centroids_px);
-                    }
-                    else
-                    {
-                        if (_param.debug)
-                            ROS_INFO("Hull already detected!");
-                    }
-                }
-            }
-            /* code */
-        }
-
-        // check recent potential staircases against previously-found staircases
-        // TODO
-    }
-    else
-    {
-        if (_param.debug)
-            ROS_INFO("No stitch in progress");
+        hull_centroids_px.push_back(calc_centroid_pixel(hulls[i][0]));
     }
 
-    std::clock_t t_1 = std::clock();
+    // convert bounds, centroids from pixels to world-frame coordinates
+    vector<vector<Eigen::Vector3d>> hull_bounds_wf = hull_px_to_wf(hulls);
+    vector<Eigen::Vector2d> hull_centroids_wf = hull_centroid_px_to_wf(hull_centroids_px);
 
-    if (true)
-    {
-        double cps = CLOCKS_PER_SEC;
-        std::cout << "\nTIMINGS:" << std::endl;
-        std::cout << "total time:\t" << (t_1 - t_0) / cps << std::endl;
-        std::cout << "pcl->img time:\t" << (t_be_1 - t_be_0) / cps << std::endl;
-        std::cout << "img filt time:\t" << (t_filt_1 - t_filt_0) / cps << std::endl;
-        std::cout << "pub time:\t" << (t_pub_1 - t_pub_0) / cps << std::endl;
+    // publish convex hull polygons
+    for (auto h : hull_bounds_wf)
+    {   
+        ROS_INFO("\nATTEMPTING TO PUBLISH POLYGON");
+        std::cout << h.size() << std::endl;
+        geometry_msgs::PolygonStamped hull_msg = hull_to_polygon_msg(h, 1);
+        _pub_staircase_polygon.publish(hull_msg);
     }
 
+    // publish any new centroids found
+    process_and_publish_centroids(hull_centroids_wf);
     return;
 }
 
+void stairDetector::process_and_publish_centroids(
+    const vector<Eigen::Vector2d> & hull_centroids_wf)
+{
+    // check for previously-found centroids
+    if (_unconfirmed_centroids.empty()) 
+    {
+        for (auto h : hull_centroids_wf) 
+        {
+            _unconfirmed_centroids.push_back(h);
+        }
+    }
+    else 
+    {
+        // check if centroid was already defined
+        for (auto c_new : hull_centroids_wf) 
+        {
+            bool centroid_already_confirmed = false;
+            for (auto c_conf : _confirmed_centroids)
+            {
+                double dx = c_new[0] - c_conf[0];
+                double dy = c_new[1] - c_conf[1];
+                if (sqrt(dx * dx + dy * dy) < _min_dist_between_stairs)
+                {
+                    centroid_already_confirmed = true;
+                    // update confirmed centroid position as average of new and previous value
+                    c_conf[0] = (c_conf[0] + c_new[0]) / 2;
+                    c_conf[1] = (c_conf[1] + c_new[1]) / 2;
+                }
+            }          
+
+            // if the centroid hasn't been found, check if it corresponds to an unconfirmed centroid
+            if (! centroid_already_confirmed) 
+            {
+                vector<Eigen::Vector2d> new_unconf_centroids;
+                for (int i = 0; i < _unconfirmed_centroids.size(); i++)
+                {
+                    double dx = c_new[0] - _unconfirmed_centroids[i][0];
+                    double dy = c_new[1] - _unconfirmed_centroids[i][1];
+                    // if the new centroid is close to an unconfirmed centroid,
+                    // remove it from the unconfirmed list, publish it,
+                    // and place it in the confirmed list
+                    if (sqrt(dx * dx + dy * dy) < _min_dist_between_stairs)
+                    {
+                    ROS_INFO("\nNEW confirmed CENTROID FOUND");
+                        // centroid has position = average of previous and new
+                        Eigen::Vector2d centroid_to_publish;
+                        centroid_to_publish[0] = (c_new[0] + _unconfirmed_centroids[i][0]) / 2.0;
+                        centroid_to_publish[1] = (c_new[1] + _unconfirmed_centroids[i][1]) / 2.0;
+
+                        // convert to message, publish
+                        // visualization
+                        visualization_msgs::Marker centroid_vis_msg = centroid_to_marker_msg(centroid_to_publish);
+                        _pub_centroid_marker.publish(centroid_vis_msg);
+                        // pose message for planner
+                        geometry_msgs::PoseStamped centroid_pose_msg = hull_centroid_to_pose_msg(centroid_to_publish);
+                        _pub_centroid_pose.publish(centroid_pose_msg);
+
+                        // add newly confirmed centroid
+                        _confirmed_centroids.push_back(centroid_to_publish);
+
+                        // remove unconfirmed centroid
+                        _unconfirmed_centroids.erase(_unconfirmed_centroids.begin() + i);
+                    }
+                    else
+                    {
+                        // otherwise, hold this newly unconfirmed centroid to be added to the list
+                        new_unconf_centroids.push_back(c_new);
+                    }
+                }
+
+                // add all new unconfirmed centroids
+                for (auto c_new_unconf : new_unconf_centroids)
+                {
+                    ROS_INFO("\nNEW UNCONFIRMED CENTROID FOUND");
+                    _unconfirmed_centroids.push_back(c_new_unconf);
+                }
+            }  
+        }
+    }
+    return;
+}
+
+// check whether hull area exceeds threshold
 bool stairDetector::check_hull_area(
     const double &hull_area)
 {
@@ -222,43 +247,86 @@ bool stairDetector::check_hull_area(
     return area < _param.staircase_max_area && area > _param.staircase_min_area;
 }
 
-void stairDetector::px_to_m_and_publish(
-    vector<vector<vector<cv::Point>>> hulls,
-    vector<cv::Point> hull_centroids_px)
+// convert a convex hull from pixel coordinates to world frame coordinates
+vector<vector<Eigen::Vector3d>> stairDetector::hull_px_to_wf(
+    const vector<vector<vector<cv::Point>>> & hulls)
 {
-    vector<vector<tf::Vector3>> hulls_rf(hulls.size());
-    vector<vector<tf::Vector3>> hulls_wf(hulls.size());
-
+    vector<vector<Eigen::Vector3d>> hulls_wf;
     Eigen::Vector2d xy;
     for (int i = 0; i < hulls.size(); i++)
     {
-        for (int j = 0; j < hulls[i][0].size(); j++)
+        vector<Eigen::Vector3d> hull;
+        for (int j = 0; j < hulls[i].size(); j++ ) 
         {
             xy = px_to_m(hulls[i][0][j]);
-            hulls_rf[i].push_back(tf::Vector3(xy[0], xy[1], _callback_pose.pose.pose.position.z));
+            hull.push_back(Eigen::Vector3d(xy[0], xy[1], _callback_pose.pose.pose.position.z));
         }
+        hulls_wf.push_back(hull);
     }
-    if (_param.debug)
-        ROS_INFO("Convex Hull in World frame... Done!");
-
-    // publish the hulls as rviz polygons
-    int j = 0;
-    while (j < hulls_rf.size())
-    {
-        if (hulls_rf[j].size() > 0)
-        {
-            geometry_msgs::PolygonStamped msg;
-            msg = hull_to_polygon_msg(hulls_rf[j], j);
-            _pub_staircase_polygon.publish(msg);
-        }
-        j++;
-    }
-
-    return;
+    return hulls_wf;
 }
 
+// convert a centroid of a convext hull from pixel coordinates to world frame coordinates
+vector<Eigen::Vector2d> stairDetector::hull_centroid_px_to_wf(
+    const vector<cv::Point> centroids_px)
+{
+    vector<Eigen::Vector2d> centroids_wf;
+    for (int i = 0; i < centroids_px.size(); i++) 
+    {
+        centroids_wf.push_back(px_to_m(centroids_px[i]));
+    }
+    return centroids_wf;
+}
+
+// convert hull centroid to pose message for planner
+geometry_msgs::PoseStamped stairDetector::hull_centroid_to_pose_msg(
+    const Eigen::Vector2d & centroid)
+{
+    geometry_msgs::PoseStamped msg;
+    msg.header.frame_id = _frame_world;
+    msg.header.stamp = ros::Time::now();
+    msg.pose.position.x = centroid[0];
+    msg.pose.position.y = centroid[1];
+    msg.pose.position.z = _callback_pose.pose.pose.position.z;
+    msg.pose.orientation.x = 0;
+    msg.pose.orientation.y = 0;
+    msg.pose.orientation.z = 0;
+    msg.pose.orientation.w = 1;
+    return msg;
+}
+
+// convert a centroid in world frame to marker message
+visualization_msgs::Marker stairDetector::centroid_to_marker_msg(
+    const Eigen::Vector2d & centroid )
+{
+    visualization_msgs::Marker msg;
+    msg.pose.position.x = centroid[0];
+    msg.pose.position.y = centroid[1];
+    msg.pose.position.z = _callback_pose.pose.pose.position.z;
+    msg.pose.orientation.x = 0;
+    msg.pose.orientation.y = 0;
+    msg.pose.orientation.z = 0;
+    msg.pose.orientation.w = 1;
+
+    msg.header.frame_id = _frame_world;
+    msg.header.stamp = ros::Time::now();
+    msg.type = visualization_msgs::Marker::SPHERE;
+    msg.lifetime = ros::Duration(5);
+
+    msg.scale.x = 1.0;
+    msg.scale.y = 1.0;
+    msg.scale.z = 1.0;
+
+    msg.color.a = 1.0;
+    msg.color.g = 0.05;
+    msg.color.b = 0.05;
+    msg.color.r = 1.0;
+    return msg;
+}
+
+// convert hull to polygon message
 geometry_msgs::PolygonStamped stairDetector::hull_to_polygon_msg(
-    const vector<tf::Vector3> &hull,
+    const vector<Eigen::Vector3d> &hull,
     int seq_id)
 {
     geometry_msgs::PolygonStamped msg;
@@ -274,10 +342,10 @@ geometry_msgs::PolygonStamped stairDetector::hull_to_polygon_msg(
         pt.z = hull[i][2];
         msg.polygon.points.push_back(pt);
     }
-
     return msg;
 }
 
+// convert from pixels to world-frame coordinates
 Eigen::Vector2d stairDetector::px_to_m(
     const cv::Point &pt)
 {
@@ -370,12 +438,9 @@ void stairDetector::set_param(const stairDetectorParams &param)
     return;
 }
 
+// detect potential staircases and find convex hulls around them
 vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
 {
-    if (_param.debug)
-        ROS_INFO("In filter img");
-
-    // calculates convex hulls for potential staircases
     vector<vector<vector<cv::Point>>> hulls;
 
     Mat line_img, filtered_line_img;
@@ -447,7 +512,6 @@ vector<vector<vector<cv::Point>>> stairDetector::filter_img(cv::Mat &raw_img)
         if (_param.debug)
             ROS_INFO("Not enough lines detected");
     }
-
     return hulls;
 }
 
@@ -491,7 +555,6 @@ vector<vector<cv::Point>> stairDetector::calc_cluster_bounds(
             convexHull(Mat(line_endpoints[i]), hull[i], false);
         }
     }
-
     return hull;
 }
 
@@ -510,25 +573,7 @@ void stairDetector::process_clustered_lines(
         filt_lines = filter_lines_by_mid_pts_dist(filt_lines);
         processed_lines.push_back(filt_lines);
     }
-
     return;
-}
-
-Lines stairDetector::filter_lines_by_covariance(
-    const Lines &lines)
-{
-    Lines filt_lines;
-
-    // get covariance matrix for each cluster
-    if (lines.size() > _min_stair_steps)
-    {
-        Eigen::Matrix2d sigma = calc_covariance_matrix(lines);
-
-        // eigenvalues of covariance matrix
-        Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(sigma);
-        Eigen::Vector2d e_vals = eigensolver.eigenvalues();
-    }
-    return filt_lines;
 }
 
 Lines stairDetector::filter_lines_by_mid_pts_dist(
@@ -588,8 +633,8 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
         double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
         double stdev = std::sqrt(sq_sum / min_dists.size());
 
-        if (_param.debug)
-            ROS_INFO("Mean = %f | Variance = %f", mean, stdev);
+        // if (_param.debug)
+            // ROS_INFO("Mean = %f | Variance = %f", mean, stdev);
 
         if (stdev < 20 && mean < 60)
         {
@@ -684,7 +729,6 @@ vector<Lines> stairDetector::filter_lines_by_angle(
 
     angular_clusters.push_back(filt_lines_0);
     angular_clusters.push_back(filt_lines_1);
-
     return angular_clusters;
 }
 
@@ -845,33 +889,6 @@ void stairDetector::cluster_by_kmeans(
     }
     return;
 }
-Eigen::Matrix2d stairDetector::calc_covariance_matrix(const Lines &lines)
-{
-    Eigen::Matrix2d cov_mat;
-    double x_bar;
-    double y_bar;
-
-    // calculate x, y, means
-    for (int i = 0; i < lines.size(); i++)
-    {
-        x_bar += lines[i].p_mid.x;
-        y_bar += lines[i].p_mid.y;
-    }
-    x_bar /= float(lines.size());
-    y_bar /= float(lines.size());
-
-    // build data matrix
-    Eigen::MatrixXd data_mat(lines.size(), 2);
-    for (int i = 0; i < lines.size(); i++)
-    {
-        data_mat(i, 0) = lines[i].p_mid.x - x_bar;
-        data_mat(i, 1) = lines[i].p_mid.y - y_bar;
-    }
-
-    cov_mat = data_mat.transpose() * data_mat;
-    cov_mat /= float(lines.size());
-    return cov_mat;
-}
 
 Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
 {
@@ -910,15 +927,18 @@ Lines stairDetector::filter_lines_by_gransac(const Lines &lines_in)
 
             Point2f Pt(RPt->m_Point2D[0], RPt->m_Point2D[1]);
             for (auto line : lines_in)
+            {
                 if (line.p_mid == Pt)
                 {
                     lines_out.push_back(line);
                 }
+            }
         }
     }
     else
     {
-        if (_param.debug)
+        // if (_param.debug)
+        if (false)
         {
             ROS_INFO("Not enough inliers in to run ransac");
             ROS_INFO("Size Lines IN = %d", lines_in.size());

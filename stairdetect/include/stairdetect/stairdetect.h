@@ -27,7 +27,9 @@
 // #include <Eigen/Dense>
 #include "Eigen/Geometry"
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PolygonStamped.h>
+#include <geometry_msgs/Point.h>
 
 // opencv stuff
 #include <opencv2/core.hpp>
@@ -45,6 +47,9 @@
 
 #include <dynamic_reconfigure/server.h>
 #include <stairdetect/StairDetectConfig.h>
+
+#include <visualization_msgs/MarkerArray.h>
+#include <visualization_msgs/Marker.h>
 
 using namespace std;
 using namespace cv;
@@ -112,15 +117,24 @@ public:
   vector<Lines> subcluster_by_orientation(const vector<Lines> &clustered_lines);
   vector<Lines> filter_lines_by_angle(const Lines &lines_in);
   Lines filter_lines_by_mid_pts_dist(const Lines &lines_in);
-  Lines filter_lines_by_covariance(const Lines &lines_in);
   Lines filter_lines_by_gransac(const Lines &lines_in);
 
-  Eigen::Matrix2d calc_covariance_matrix(const Lines &lines);
   vector<vector<cv::Point>> calc_cluster_bounds(const Lines &lines);
+  vector<vector<Eigen::Vector3d>> hull_px_to_wf(
+      const vector<vector<vector<cv::Point>>> & hulls);
 
   Eigen::Vector2d px_to_m(const cv::Point &pt);
-  void px_to_m_and_publish(vector<vector<vector<cv::Point>>> hulls, vector<cv::Point> hull_centroids_px);
-  geometry_msgs::PolygonStamped hull_to_polygon_msg(const vector<tf::Vector3> &hull, int seq_id);
+  geometry_msgs::PolygonStamped hull_to_polygon_msg(const vector<Eigen::Vector3d> &hull, int seq_id);
+  visualization_msgs::Marker centroid_to_marker_msg(const Eigen::Vector2d & centroid);
+  geometry_msgs::PoseStamped hull_centroid_to_pose_msg(
+    const Eigen::Vector2d & centroid);
+
+  vector<Eigen::Vector2d> hull_centroid_px_to_wf(
+    const vector<cv::Point> centroids_px);
+
+  void process_and_publish_centroids(
+      const vector<Eigen::Vector2d> & hull_centroids_wf);
+
 
   bool check_hull_area(const double &hull_area);
 
@@ -140,6 +154,8 @@ private:
   // publishers
   ros::Publisher _pub_trimmed_pcl;
   ros::Publisher _pub_staircase_polygon;
+  ros::Publisher _pub_centroid_marker;
+  ros::Publisher _pub_centroid_pose;
   image_transport::Publisher _pub_bird_view_img;
   image_transport::Publisher _pub_proc_img;
   image_transport::Publisher _pub_morph_img;
@@ -158,6 +174,8 @@ private:
   std::string _topic_line_img;
   std::string _topic_filtered_line_img;
   std::string _topic_polygon;
+  std::string _topic_centroid_vis;
+  std::string _topic_centroid_pose;
 
   // frame names
   std::string _frame_world;
@@ -191,7 +209,9 @@ private:
   int _min_stair_steps = 3;
 
   // check if stair is already detected
-  vector<Point> _total_centroids;
+  // vector<Point> _total_centroids;
+  vector<Eigen::Vector2d> _confirmed_centroids;
+  vector<Eigen::Vector2d> _unconfirmed_centroids;
   int _min_dist_between_stairs = 100;
 };
 

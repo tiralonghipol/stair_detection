@@ -12,6 +12,8 @@
         <param name="topic_line_img" value="line_img" type="str"/>
         <param name="topic_filtered_line_img" value="filtered_line_img" type="str"/>
         <param name="topic_staircase_polygon" value="staircase_bound" type="str"/>
+        <param name="topic_staircase_centroid" value="staircase_center" type="str"/>
+        <param name="topic_staircase_centroid_pose" value="staircase_center_pose" type="str"/>
 
         <!-- frames -->
         <param name="frame_world" value="/world" type="str"/>
