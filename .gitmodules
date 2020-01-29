@@ -1,4 +1,0 @@
-[submodule "lidar_stitch"]
-	path = lidar_stitch
-	url = https://github.com/unr-arl/lidar_stitch.git
-	branch = lidar_stitch_staircase
