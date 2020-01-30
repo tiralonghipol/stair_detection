@@ -19,6 +19,15 @@
 #include <pcl_ros/filters/voxel_grid.h>
 #include <pcl_ros/filters/crop_box.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include "pcl/PointIndices.h"
+#include "pcl/common/angles.h"
+#include "pcl/common/common.h"
+#include "pcl/filters/extract_indices.h"
+#include "pcl/sample_consensus/method_types.h"
+#include "pcl/sample_consensus/model_types.h"
+#include "pcl/segmentation/sac_segmentation.h"
+#include "pcl/segmentation/extract_clusters.h"
+#include <pcl/filters/statistical_outlier_removal.h>
 
 #include <iostream>
 #include <string>
@@ -77,7 +86,7 @@ struct stairDetectorParams
 
   // pcl to img params
   // THESE SHOULD PROBABLY COME FROM LIDAR_STITCH_PARAMS
-  double img_xy_dim = 25;
+  double img_xy_dim = 20;
   double img_resolution = 0.02;
 
   double staircase_max_area = 10.0;
@@ -121,20 +130,19 @@ public:
 
   vector<vector<cv::Point>> calc_cluster_bounds(const Lines &lines);
   vector<vector<Eigen::Vector3d>> hull_px_to_wf(
-      const vector<vector<vector<cv::Point>>> & hulls);
+      const vector<vector<vector<cv::Point>>> &hulls);
 
   Eigen::Vector2d px_to_m(const cv::Point &pt);
   geometry_msgs::PolygonStamped hull_to_polygon_msg(const vector<Eigen::Vector3d> &hull, int seq_id);
-  visualization_msgs::Marker centroid_to_marker_msg(const Eigen::Vector2d & centroid);
+  visualization_msgs::Marker centroid_to_marker_msg(const Eigen::Vector2d &centroid);
   geometry_msgs::PoseStamped hull_centroid_to_pose_msg(
-    const Eigen::Vector2d & centroid);
+      const Eigen::Vector2d &centroid);
 
   vector<Eigen::Vector2d> hull_centroid_px_to_wf(
-    const vector<cv::Point> centroids_px);
+      const vector<cv::Point> centroids_px);
 
   void process_and_publish_centroids(
-      const vector<Eigen::Vector2d> & hull_centroids_wf);
-
+      const vector<Eigen::Vector2d> &hull_centroids_wf);
 
   bool check_hull_area(const double &hull_area);
 
@@ -143,7 +151,27 @@ public:
 
   cv::Point calc_centroid_pixel(const vector<cv::Point> &hull);
 
+  // ------------------------------------------- //
+  void segment_surface(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+                       pcl::PointIndices::Ptr indices);
+
+  void get_axis_aligned_bounding_box(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+                                     geometry_msgs::Pose *pose,
+                                     geometry_msgs::Vector3 *dimensions);
+
+  // ------------------------------------------- //
 private:
+  // ------------------------------------------- //
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr _actual_cloud;
+  ros::Publisher _pub_stair_plane;
+  ros::Publisher _pub_stair_marker;
+
+  std::string _frame_stair_marker;
+  std::string _topic_stair_plane = "stair_plane";
+
+  // ------------------------------------------- //
+
   // subscribers
   ros::Subscriber _sub_stitched_pcl;
   ros::Subscriber _sub_pose;
@@ -216,3 +244,13 @@ private:
 };
 
 #endif
+
+// LSD Parameters
+// _refine	The way found lines will be refined, see LineSegmentDetectorModes
+// _scale	The scale of the image that will be used to find the lines. Range (0..1].
+// _sigma_scale	Sigma for Gaussian filter. It is computed as sigma = _sigma_scale/_scale.
+// _quant	Bound to the quantization error on the gradient norm.
+// _ang_th	Gradient angle tolerance in degrees.
+// _log_eps	Detection threshold: -log10(NFA) > log_eps. Used only when advance refinement is chosen.
+// _density_th	Minimal density of aligned region points in the enclosing rectangle.
+// _n_bins	Number of bins in pseudo-ordering of gradient modulus.

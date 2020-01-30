@@ -1,5 +1,6 @@
 #include "stairdetect/stairdetect.h"
 #include "stairdetect/line.h"
+// #include "stairdetect/segment.h"
 
 stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSize)
 {
@@ -17,6 +18,8 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     n.getParam("topic_staircase_polygon", _topic_polygon);
     n.getParam("topic_staircase_centroid", _topic_centroid_vis);
     n.getParam("topic_staircase_centroid_pose", _topic_centroid_pose);
+
+    n.getParam("frame_stair_marker", _frame_stair_marker);
 
     // frames
     n.getParam("frame_world", _frame_world);
@@ -58,6 +61,13 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     _pub_centroid_marker = n.advertise<visualization_msgs::Marker>(_topic_centroid_vis, 10);
     _pub_centroid_pose = n.advertise<geometry_msgs::PoseStamped>(_topic_centroid_pose, 10);
 
+    // ------------------------------------------------------ //
+
+    _pub_stair_plane = n.advertise<sensor_msgs::PointCloud2>(_topic_stair_plane, bufSize);
+    _pub_stair_marker = n.advertise<visualization_msgs::Marker>(_frame_stair_marker, bufSize);
+
+    // ------------------------------------------------------ //
+
     image_transport::ImageTransport it_0(n);
     _pub_bird_view_img = it_0.advertise(_topic_bird_eye_img, 1);
     image_transport::ImageTransport it_1(n);
@@ -81,22 +91,121 @@ stairDetector::stairDetector(ros::NodeHandle &n, const std::string &s, int bufSi
     set_param(_param);
 }
 
-void stairDetector::callback_stitched_pcl(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg)
+void stairDetector::get_axis_aligned_bounding_box(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+                                                  geometry_msgs::Pose *pose,
+                                                  geometry_msgs::Vector3 *dimensions)
 {
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointXYZ min_pcl;
+    pcl::PointXYZ max_pcl;
+    pcl::getMinMax3D<pcl::PointXYZ>(*cloud, min_pcl, max_pcl);
+    double center_x = (max_pcl.x + min_pcl.x) / 2;
+    double center_y = (max_pcl.y + min_pcl.y) / 2;
+    double center_z = (max_pcl.z + min_pcl.z) / 2;
+    double x_dim = max_pcl.x - min_pcl.x;
+    double y_dim = max_pcl.y - min_pcl.y;
+    double z_dim = max_pcl.z - min_pcl.z;
 
-    // pcl::RadiusOutlierRemoval<pcl::PointXYZ> outrem;
-    // outrem.setInputCloud(msg);
-    // outrem.setRadiusSearch(10.0);
-    // outrem.setMinNeighborsInRadius(500);
-    // outrem.filter(*cloud_filtered);
+    if (cloud->size() > 0)
+    {
+        dimensions->x = x_dim;
+        dimensions->y = y_dim;
+        dimensions->z = z_dim;
+    }
+    else
+    {
+        dimensions->x = 0;
+        dimensions->y = 0;
+        dimensions->z = 0;
+    }
+
+    pose->position.x = center_x;
+    pose->position.y = center_y;
+    pose->position.z = center_z;
+
+    pose->orientation.x = 0;
+    pose->orientation.z = 0;
+    pose->orientation.y = 0;
+    pose->orientation.w = 1;
+    return;
+}
+
+void stairDetector::segment_surface(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+                                    pcl::PointIndices::Ptr indices)
+{
+    pcl::PointIndices indices_internal;
+    pcl::SACSegmentation<pcl::PointXYZ> seg;
+    seg.setOptimizeCoefficients(true);
+    seg.setModelType(pcl::SACMODEL_PARALLEL_PLANE);
+    seg.setMethodType(pcl::SAC_LMEDS);
+    // Set the distance to the plane for a point to be an inlier.
+    seg.setDistanceThreshold(0.05);
+    seg.setInputCloud(cloud);
+
+    // Make sure that the plane is perpendicular to y=x-axis, 10 degree tolerance.
+    Eigen::Vector3f axis;
+
+    axis << sqrt(2) / 2, sqrt(2) / 2, 0;
+    // axis << 0, 0, 1;
+    seg.setAxis(axis);
+    seg.setEpsAngle(pcl::deg2rad(5.0));
+
+    // coeff contains the coefficients of the plane:
+    // ax + by + cz + d = 0
+    pcl::ModelCoefficients coeff;
+    seg.segment(indices_internal, coeff);
+
+    *indices = indices_internal;
+
+    if (indices->indices.size() == 0)
+    {
+        if (_param.debug)
+            ROS_INFO("Unable to find surface.");
+        return;
+    }
+    return;
+}
+
+void stairDetector::callback_stitched_pcl(const pcl::PointCloud<pcl::PointXYZ>::Ptr &msg)
+{
+    pcl::PointCloud<pcl::PointXYZ>::Ptr subset_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
 
     if (!msg->empty())
     {
         _recent_pose = _pose_Q[0];
         _recent_cloud = msg;
-        // _recent_cloud = cloud_filtered;
+
+        // ----------------------------------------------------- //
+        // _actual_cloud = msg;
+        // pcl::PointIndices::Ptr stair_inliers(new pcl::PointIndices());
+        // segment_surface(_actual_cloud, stair_inliers);
+
+        // for (size_t i = 0; i < stair_inliers->indices.size(); ++i)
+        // {
+        //     int index = stair_inliers->indices[i];
+        //     const pcl::PointXYZ &pt = _actual_cloud->points[index];
+        // }
+        // // PointCloudC::Ptr subset_cloud(new PointCloudC());
+        // // Extract subset of original_cloud into subset_cloud:
+        // pcl::ExtractIndices<pcl::PointXYZ> extract;
+        // extract.setInputCloud(_actual_cloud);
+        // extract.setIndices(stair_inliers);
+        // extract.filter(*subset_cloud);
+
+        // sensor_msgs::PointCloud2 msg_out;
+        // pcl::toROSMsg(*subset_cloud, msg_out);
+        // _pub_stair_plane.publish(msg_out);
+
+        // visualization_msgs::Marker stair_marker;
+        // // stair_marker.ns = "stair_detect";
+        // stair_marker.header.frame_id = _frame_world;
+        // stair_marker.type = visualization_msgs::Marker::CUBE;
+        // get_axis_aligned_bounding_box(subset_cloud, &stair_marker.pose, &stair_marker.scale);
+        // stair_marker.color.g = 1;
+        // stair_marker.color.a = 0.5;
+        // _pub_stair_marker.publish(stair_marker);
+        // // _recent_cloud = cloud_filtered;
+        
     }
     else
     {
@@ -142,7 +251,7 @@ void stairDetector::callback_timer_trigger(
 
     // publish convex hull polygons
     for (auto h : hull_bounds_wf)
-    {   
+    {
         geometry_msgs::PolygonStamped hull_msg = hull_to_polygon_msg(h, 1);
         _pub_staircase_polygon.publish(hull_msg);
     }
@@ -153,20 +262,20 @@ void stairDetector::callback_timer_trigger(
 }
 
 void stairDetector::process_and_publish_centroids(
-    const vector<Eigen::Vector2d> & hull_centroids_wf)
+    const vector<Eigen::Vector2d> &hull_centroids_wf)
 {
     // check for previously-found centroids
-    if (_unconfirmed_centroids.empty()) 
+    if (_unconfirmed_centroids.empty())
     {
-        for (auto h : hull_centroids_wf) 
+        for (auto h : hull_centroids_wf)
         {
             _unconfirmed_centroids.push_back(h);
         }
     }
-    else 
+    else
     {
         // check if centroid was already defined
-        for (auto c_new : hull_centroids_wf) 
+        for (auto c_new : hull_centroids_wf)
         {
             bool centroid_already_confirmed = false;
             for (auto c_conf : _confirmed_centroids)
@@ -180,10 +289,10 @@ void stairDetector::process_and_publish_centroids(
                     c_conf[0] = (c_conf[0] + c_new[0]) / 2;
                     c_conf[1] = (c_conf[1] + c_new[1]) / 2;
                 }
-            }          
+            }
 
             // if the centroid hasn't been found, check if it corresponds to an unconfirmed centroid
-            if (! centroid_already_confirmed) 
+            if (!centroid_already_confirmed)
             {
                 vector<Eigen::Vector2d> new_unconf_centroids;
                 for (int i = 0; i < _unconfirmed_centroids.size(); i++)
@@ -226,7 +335,7 @@ void stairDetector::process_and_publish_centroids(
                 {
                     _unconfirmed_centroids.push_back(c_new_unconf);
                 }
-            }  
+            }
         }
     }
     return;
@@ -243,14 +352,14 @@ bool stairDetector::check_hull_area(
 
 // convert a convex hull from pixel coordinates to world frame coordinates
 vector<vector<Eigen::Vector3d>> stairDetector::hull_px_to_wf(
-    const vector<vector<vector<cv::Point>>> & hulls)
+    const vector<vector<vector<cv::Point>>> &hulls)
 {
     vector<vector<Eigen::Vector3d>> hulls_wf;
     Eigen::Vector2d xy;
     for (int i = 0; i < hulls.size(); i++)
     {
         vector<Eigen::Vector3d> hull;
-        for (int j = 0; j < hulls[i][0].size(); j++ ) 
+        for (int j = 0; j < hulls[i][0].size(); j++)
         {
             xy = px_to_m(hulls[i][0][j]);
             hull.push_back(Eigen::Vector3d(xy[0], xy[1], _callback_pose.pose.pose.position.z));
@@ -265,7 +374,7 @@ vector<Eigen::Vector2d> stairDetector::hull_centroid_px_to_wf(
     const vector<cv::Point> centroids_px)
 {
     vector<Eigen::Vector2d> centroids_wf;
-    for (int i = 0; i < centroids_px.size(); i++) 
+    for (int i = 0; i < centroids_px.size(); i++)
     {
         centroids_wf.push_back(px_to_m(centroids_px[i]));
     }
@@ -274,7 +383,7 @@ vector<Eigen::Vector2d> stairDetector::hull_centroid_px_to_wf(
 
 // convert hull centroid to pose message for planner
 geometry_msgs::PoseStamped stairDetector::hull_centroid_to_pose_msg(
-    const Eigen::Vector2d & centroid)
+    const Eigen::Vector2d &centroid)
 {
     geometry_msgs::PoseStamped msg;
     msg.header.frame_id = _frame_world;
@@ -291,7 +400,7 @@ geometry_msgs::PoseStamped stairDetector::hull_centroid_to_pose_msg(
 
 // convert a centroid in world frame to marker message
 visualization_msgs::Marker stairDetector::centroid_to_marker_msg(
-    const Eigen::Vector2d & centroid )
+    const Eigen::Vector2d &centroid)
 {
     visualization_msgs::Marker msg;
     msg.pose.position.x = centroid[0];
@@ -625,7 +734,7 @@ Lines stairDetector::filter_lines_by_mid_pts_dist(
         double stdev = std::sqrt(sq_sum / min_dists.size());
 
         // if (_param.debug)
-            // ROS_INFO("Mean = %f | Variance = %f", mean, stdev);
+        // ROS_INFO("Mean = %f | Variance = %f", mean, stdev);
 
         if (stdev < 20)
         {

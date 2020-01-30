@@ -19,6 +19,8 @@
         <param name="frame_world" value="/world" type="str"/>
         <param name="frame_pcl" value="/velodyne" type="str"/>
 
+        <param name="frame_stair_marker" value="/velodyne" type="str"/>
+
         <!-- dynamic parameters-->
         <param name="debug" value="true" type="bool"/>
 
@@ -29,15 +31,15 @@
         <param name="median_kernel_size" value="3" type="int"/>
 
         <!-- line segment detector -->
-        <param name="lsd_scale" value=" 0.25" type="double"/>
-        <param name="lsd_sigma_scale" value=" 0.25" type="double"/>
-        <param name="lsd_quant" value="2.0" type="double"/>
-        <param name="lsd_angle_th" value="22.5" type="double"/>
-        <param name="lsd_log_eps" value="0.0" type="double"/>
-        <param name="lsd_density_th" value="0.1" type="double"/>
+        <param name="lsd_scale" value=" 0.3" type="double"/> #0.8
+        <param name="lsd_sigma_scale" value=" 0.3" type="double"/> #0.6
+        <param name="lsd_quant" value="2.0" type="double"/> #2.0
+        <param name="lsd_angle_th" value="22.5" type="double"/> #22.5
+        <param name="lsd_log_eps" value="0.0" type="double"/> #0
+        <param name="lsd_density_th" value="0.1" type="double"/> #0.7
 
         <!-- timing -->
-        <param name="stair_detect_timing" value="3.0" type="double"/>
+        <param name="stair_detect_timing" value="2.0" type="double"/>
 
         <!-- clustering -->
         <param name="max_clusters" value="8" type="int"/>
