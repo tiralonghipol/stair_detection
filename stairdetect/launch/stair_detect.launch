@@ -1,11 +1,13 @@
 <launch>
-    <arg name="rviz" default="true" />
+    <arg name="rviz" default="false" />
     <node name="stairdetect" pkg="stairdetect" type="stairdetect_node" clear_params="true" output="screen">
 
         <!-- topic names -->
         <param name="topic_stitched_pointcloud" value="/lidar_stitch/points_stitched" type="str"/>
         <!-- <param name="topic_stitched_pointcloud" value="/os1_node/points_raw" type="str"/> -->
-        <param name="topic_pose" value="/msf_core/pose" type="str"/>
+        <!-- <param name="topic_pose" value="/msf_core/pose" type="str"/> -->
+        <param name="topic_pose" value="/m100/odometry_sensor1/pose_with_covariance" type="str"/>
+
         <param name="topic_trimmed_pcl" value="trimmed_pcl" type="str"/>
         <param name="topic_bird_eye_img" value="bird_eye_img" type="str"/>
         <param name="topic_proc_img" value="proc_img" type="str"/>
